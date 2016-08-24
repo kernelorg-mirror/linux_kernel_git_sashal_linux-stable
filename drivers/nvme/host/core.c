@@ -504,7 +504,7 @@ int nvme_get_features(struct nvme_ctrl *dev, unsigned fid, unsigned nsid,
 	c.features.fid = cpu_to_le32(fid);
 
 	ret = __nvme_submit_sync_cmd(dev->admin_q, &c, &cqe, NULL, 0, 0);
-	if (ret >= 0)
+	if (ret >= 0 && result)
 		*result = le32_to_cpu(cqe.result);
 	return ret;
 }
@@ -523,7 +523,7 @@ int nvme_set_features(struct nvme_ctrl *dev, unsigned fid, unsigned dword11,
 	c.features.dword11 = cpu_to_le32(dword11);
 
 	ret = __nvme_submit_sync_cmd(dev->admin_q, &c, &cqe, NULL, 0, 0);
-	if (ret >= 0)
+	if (ret >= 0 && result)
 		*result = le32_to_cpu(cqe.result);
 	return ret;
 }
