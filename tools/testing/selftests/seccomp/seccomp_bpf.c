@@ -1830,6 +1830,23 @@ struct tsync_sibling {
 	struct __test_metadata *metadata;
 };
 
+/*
+ * To avoid joining joined threads (which is not allowed by Bionic),
+ * make sure we both successfully join and clear the tid to skip a
+ * later join attempt during fixture teardown. Any remaining threads
+ * will be directly killed during teardown.
+ */
+#define PTHREAD_JOIN(tid, status)					\
+	do {								\
+		int _rc = pthread_join(tid, status);			\
+		if (_rc) {						\
+			TH_LOG("pthread_join of tid %u failed: %d\n",	\
+				(unsigned int)tid, _rc);		\
+		} else {						\
+			tid = 0;					\
+		}							\
+	} while (0)
+
 FIXTURE_DATA(TSYNC) {
 	struct sock_fprog root_prog, apply_prog;
 	struct tsync_sibling sibling[TSYNC_SIBLINGS];
@@ -1898,14 +1915,14 @@ FIXTURE_TEARDOWN(TSYNC)
 
 	for ( ; sib < self->sibling_count; ++sib) {
 		struct tsync_sibling *s = &self->sibling[sib];
-		void *status;
 
 		if (!s->tid)
 			continue;
-		if (pthread_kill(s->tid, 0)) {
-			pthread_cancel(s->tid);
-			pthread_join(s->tid, &status);
-		}
+		/*
+		 * If a thread is still running, it may be stuck, so hit
+		 * it over the head really hard.
+		 */
+		pthread_kill(s->tid, 9);
 	}
 	pthread_mutex_destroy(&self->mutex);
 	pthread_cond_destroy(&self->cond);
@@ -1995,9 +2012,9 @@ TEST_F(TSYNC, siblings_fail_prctl)
 	pthread_mutex_unlock(&self->mutex);
 
 	/* Ensure diverging sibling failed to call prctl. */
-	pthread_join(self->sibling[0].tid, &status);
+	PTHREAD_JOIN(self->sibling[0].tid, &status);
 	EXPECT_EQ(SIBLING_EXIT_FAILURE, (long)status);
-	pthread_join(self->sibling[1].tid, &status);
+	PTHREAD_JOIN(self->sibling[1].tid, &status);
 	EXPECT_EQ(SIBLING_EXIT_UNKILLED, (long)status);
 }
 
@@ -2037,9 +2054,9 @@ TEST_F(TSYNC, two_siblings_with_ancestor)
 	}
 	pthread_mutex_unlock(&self->mutex);
 	/* Ensure they are both killed and don't exit cleanly. */
-	pthread_join(self->sibling[0].tid, &status);
+	PTHREAD_JOIN(self->sibling[0].tid, &status);
 	EXPECT_EQ(0x0, (long)status);
-	pthread_join(self->sibling[1].tid, &status);
+	PTHREAD_JOIN(self->sibling[1].tid, &status);
 	EXPECT_EQ(0x0, (long)status);
 }
 
@@ -2063,9 +2080,9 @@ TEST_F(TSYNC, two_sibling_want_nnp)
 	pthread_mutex_unlock(&self->mutex);
 
 	/* Ensure they are both upset about lacking nnp. */
-	pthread_join(self->sibling[0].tid, &status);
+	PTHREAD_JOIN(self->sibling[0].tid, &status);
 	EXPECT_EQ(SIBLING_EXIT_NEWPRIVS, (long)status);
-	pthread_join(self->sibling[1].tid, &status);
+	PTHREAD_JOIN(self->sibling[1].tid, &status);
 	EXPECT_EQ(SIBLING_EXIT_NEWPRIVS, (long)status);
 }
 
@@ -2103,9 +2120,9 @@ TEST_F(TSYNC, two_siblings_with_no_filter)
 	pthread_mutex_unlock(&self->mutex);
 
 	/* Ensure they are both killed and don't exit cleanly. */
-	pthread_join(self->sibling[0].tid, &status);
+	PTHREAD_JOIN(self->sibling[0].tid, &status);
 	EXPECT_EQ(0x0, (long)status);
-	pthread_join(self->sibling[1].tid, &status);
+	PTHREAD_JOIN(self->sibling[1].tid, &status);
 	EXPECT_EQ(0x0, (long)status);
 }
 
@@ -2148,9 +2165,9 @@ TEST_F(TSYNC, two_siblings_with_one_divergence)
 	pthread_mutex_unlock(&self->mutex);
 
 	/* Ensure they are both unkilled. */
-	pthread_join(self->sibling[0].tid, &status);
+	PTHREAD_JOIN(self->sibling[0].tid, &status);
 	EXPECT_EQ(SIBLING_EXIT_UNKILLED, (long)status);
-	pthread_join(self->sibling[1].tid, &status);
+	PTHREAD_JOIN(self->sibling[1].tid, &status);
 	EXPECT_EQ(SIBLING_EXIT_UNKILLED, (long)status);
 }
 
@@ -2207,7 +2224,7 @@ TEST_F(TSYNC, two_siblings_not_under_filter)
 		TH_LOG("cond broadcast non-zero");
 	}
 	pthread_mutex_unlock(&self->mutex);
-	pthread_join(self->sibling[sib].tid, &status);
+	PTHREAD_JOIN(self->sibling[sib].tid, &status);
 	EXPECT_EQ(SIBLING_EXIT_UNKILLED, (long)status);
 	/* Poll for actual task death. pthread_join doesn't guarantee it. */
 	while (!kill(self->sibling[sib].system_tid, 0))
@@ -2232,7 +2249,7 @@ TEST_F(TSYNC, two_siblings_not_under_filter)
 		TH_LOG("cond broadcast non-zero");
 	}
 	pthread_mutex_unlock(&self->mutex);
-	pthread_join(self->sibling[sib].tid, &status);
+	PTHREAD_JOIN(self->sibling[sib].tid, &status);
 	EXPECT_EQ(0, (long)status);
 	/* Poll for actual task death. pthread_join doesn't guarantee it. */
 	while (!kill(self->sibling[sib].system_tid, 0))
