@@ -26,12 +26,6 @@
 struct clk;
 struct reset_control;
 
-#ifdef CONFIG_PM_SLEEP
-enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
-void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
-void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode);
-#endif /* CONFIG_PM_SLEEP */
-
 #ifdef CONFIG_SMP
 bool tegra_pmc_cpu_is_powered(unsigned int cpuid);
 int tegra_pmc_cpu_power_on(unsigned int cpuid);
@@ -108,7 +102,7 @@ int tegra_pmc_cpu_remove_clamping(unsigned int cpuid);
 #define TEGRA_IO_RAIL_LVDS	57
 #define TEGRA_IO_RAIL_SYS_DDC	58
 
-#ifdef CONFIG_ARCH_TEGRA
+#ifdef CONFIG_SOC_TEGRA_PMC
 int tegra_powergate_is_powered(unsigned int id);
 int tegra_powergate_power_on(unsigned int id);
 int tegra_powergate_power_off(unsigned int id);
@@ -120,6 +114,11 @@ int tegra_powergate_sequence_power_up(unsigned int id, struct clk *clk,
 
 int tegra_io_rail_power_on(unsigned int id);
 int tegra_io_rail_power_off(unsigned int id);
+
+enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
+void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
+void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode);
+
 #else
 static inline int tegra_powergate_is_powered(unsigned int id)
 {
@@ -157,6 +156,20 @@ static inline int tegra_io_rail_power_off(unsigned int id)
 {
 	return -ENOSYS;
 }
-#endif /* CONFIG_ARCH_TEGRA */
+
+static inline enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
+{
+	return TEGRA_SUSPEND_NONE;
+}
+
+static inline void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode)
+{
+}
+
+static inline void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode)
+{
+}
+
+#endif /* CONFIG_SOC_TEGRA_PMC */
 
 #endif /* __SOC_TEGRA_PMC_H__ */
