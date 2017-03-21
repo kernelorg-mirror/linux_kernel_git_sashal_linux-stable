@@ -495,24 +495,19 @@ static int arch_timer_starting_cpu(unsigned int cpu)
 	return 0;
 }
 
-static void
-arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+/*
+ * For historical reasons, when probing with DT we use whichever (non-zero)
+ * rate was probed first, and don't verify that others match. If the first node
+ * probed has a clock-frequency property, this overrides the HW register.
+ */
+static void arch_timer_of_configure_rate(u32 rate, struct device_node *np)
 {
 	/* Who has more than one independent system counter? */
 	if (arch_timer_rate)
 		return;
 
-	/*
-	 * Try to determine the frequency from the device tree or CNTFRQ,
-	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
-	 */
-	if (!acpi_disabled ||
-	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-		if (cntbase)
-			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
-		else
-			arch_timer_rate = arch_timer_get_cntfrq();
-	}
+	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
+		arch_timer_rate = rate;
 
 	/* Check the timer frequency. */
 	if (arch_timer_rate == 0)
@@ -879,6 +874,7 @@ static int __init arch_timer_init(void)
 static int __init arch_timer_of_init(struct device_node *np)
 {
 	int i;
+	u32 rate;
 
 	if (arch_timers_present & ARCH_CP15_TIMER) {
 		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
@@ -889,7 +885,8 @@ static int __init arch_timer_of_init(struct device_node *np)
 	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
 
-	arch_timer_detect_rate(NULL, np);
+	rate = arch_timer_get_cntfrq;
+	arch_timer_of_configure_rate(rate, np);
 
 	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
 
@@ -924,7 +921,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
 	struct device_node *frame, *best_frame = NULL;
 	void __iomem *cntctlbase, *base;
 	unsigned int irq, ret = -EINVAL;
-	u32 cnttidr;
+	u32 cnttidr, rate;
 
 	arch_timers_present |= ARCH_MEM_TIMER;
 	cntctlbase = of_iomap(np, 0);
@@ -989,7 +986,8 @@ static int __init arch_timer_mem_init(struct device_node *np)
 		goto out;
 	}
 
-	arch_timer_detect_rate(base, np);
+	rate = readl(base + CNTFRQ);
+	arch_timer_of_configure_rate(rate, np);
 	ret = arch_timer_mem_register(base, irq);
 	if (ret)
 		goto out;
@@ -1050,8 +1048,15 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
 		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
 		gtdt->non_secure_el2_flags);
 
-	/* Get the frequency from CNTFRQ */
-	arch_timer_detect_rate(NULL, NULL);
+	/*
+	 * When probing via ACPI, we have no mechanism to override the sysreg
+	 * CNTFRQ value. This *must* be correct.
+	 */
+	arch_timer_rate = arch_timer_get_cntfrq();
+	if (!arch_timer_rate) {
+		pr_err(FW_BUG "frequency not available.\n");
+		return -EINVAL;
+	}
 
 	/* Always-on capability */
 	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
