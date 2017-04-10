@@ -695,7 +695,7 @@ static void ipoib_stop_ah(struct net_device *dev)
 	ipoib_flush_ah(dev);
 }
 
-static void ipoib_ib_tx_timer_func(unsigned long ctx)
+void ipoib_ib_tx_timer_func(unsigned long ctx)
 {
 	drain_tx_cq((struct net_device *)ctx);
 }
@@ -916,32 +916,6 @@ timeout:
 	ipoib_flush_ah(dev);
 
 	ib_req_notify_cq(priv->recv_cq, IB_CQ_NEXT_COMP);
-
-	return 0;
-}
-
-int ipoib_ib_dev_init(struct net_device *dev, struct ib_device *ca, int port)
-{
-	struct ipoib_dev_priv *priv = netdev_priv(dev);
-
-	priv->ca = ca;
-	priv->port = port;
-	priv->qp = NULL;
-
-	if (ipoib_transport_dev_init(dev, ca)) {
-		printk(KERN_WARNING "%s: ipoib_transport_dev_init failed\n", ca->name);
-		return -ENODEV;
-	}
-
-	setup_timer(&priv->poll_timer, ipoib_ib_tx_timer_func,
-		    (unsigned long) dev);
-
-	if (dev->flags & IFF_UP) {
-		if (ipoib_ib_dev_open(dev)) {
-			ipoib_transport_dev_cleanup(dev);
-			return -ENODEV;
-		}
-	}
 
 	return 0;
 }
@@ -1248,7 +1222,13 @@ void ipoib_ib_dev_cleanup(struct net_device *dev)
 	 */
 	ipoib_stop_ah(dev);
 
-	ipoib_transport_dev_cleanup(dev);
-}
+	clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
 
+	ipoib_dev_uninit_default(dev);
+
+	if (priv->pd) {
+		ib_dealloc_pd(priv->pd);
+		priv->pd = NULL;
+	}
+}
 
