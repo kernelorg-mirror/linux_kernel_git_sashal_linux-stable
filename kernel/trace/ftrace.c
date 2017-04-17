@@ -3189,6 +3189,7 @@ static void *
 t_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct ftrace_iterator *iter = m->private;
+	loff_t l = *pos; /* t_hash_start() must use original pos */
 	void *ret;
 
 	if (unlikely(ftrace_disabled))
@@ -3200,13 +3201,13 @@ t_next(struct seq_file *m, void *v, loff_t *pos)
 	if (iter->flags & FTRACE_ITER_PRINTALL) {
 		/* next must increment pos, and t_hash_start does not */
 		(*pos)++;
-		return t_hash_start(m, pos);
+		return t_hash_start(m, &l);
 	}
 
 	ret = t_func_next(m, pos);
 
 	if (!ret)
-		return t_hash_start(m, pos);
+		return t_hash_start(m, &l);
 
 	return ret;
 }
