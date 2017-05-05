@@ -448,6 +448,19 @@ static int get_gids_from_rdma_hdr(union rdma_network_hdr *hdr,
 	}
 }
 
+/*
+ * This function creates ah from the incoming packet.
+ * Incoming packet has dgid of the receiver node on which this code is
+ * getting executed and, sgid contains the GID of the sender.
+ *
+ * When resolving mac address of destination, the arrived dgid is used
+ * as sgid and, sgid is used as dgid because sgid contains destinations
+ * GID whom to respond to.
+ *
+ * This is why when calling rdma_addr_find_l2_eth_by_grh() function, the
+ * position of arguments dgid and sgid do not match the order of the
+ * parameters.
+ */
 int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 		       const struct ib_wc *wc, const struct ib_grh *grh,
 		       struct ib_ah_attr *ah_attr)
