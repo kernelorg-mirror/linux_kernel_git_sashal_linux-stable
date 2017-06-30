@@ -489,6 +489,14 @@ static void skl_setup_cpr_gateway_cfg(struct skl_sst *ctx,
 	else
 		cpr_mconfig->gtw_cfg.dma_buffer_size = 2 * mconfig->ibs;
 
+	/* fallback to 2ms default value */
+	if (!cpr_mconfig->gtw_cfg.dma_buffer_size) {
+		if (mconfig->hw_conn_type == SKL_CONN_SOURCE)
+			cpr_mconfig->gtw_cfg.dma_buffer_size = 2 * mconfig->obs;
+		else
+			cpr_mconfig->gtw_cfg.dma_buffer_size = 2 * mconfig->ibs;
+	}
+
 	cpr_mconfig->cpr_feature_mask = 0;
 	cpr_mconfig->gtw_cfg.config_length  = 0;
 
