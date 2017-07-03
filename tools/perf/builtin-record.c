@@ -1651,7 +1651,7 @@ int cmd_record(int argc, const char **argv, const char *prefix __maybe_unused)
 		record.opts.tail_synthesize = true;
 
 	if (rec->evlist->nr_entries == 0 &&
-	    perf_evlist__add_default(rec->evlist) < 0) {
+	    __perf_evlist__add_default(rec->evlist, !record.opts.no_samples) < 0) {
 		pr_err("Not enough memory for event selector list\n");
 		goto out;
 	}
