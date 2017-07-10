@@ -771,6 +771,9 @@ static int __init balloon_init(void)
 			balloon_add_region(xen_extra_mem[i].start_pfn,
 					   xen_extra_mem[i].n_pfns);
 
+	/* Init the xen-balloon driver. */
+	xen_balloon_init();
+
 	return 0;
 }
 subsys_initcall(balloon_init);
