@@ -3128,8 +3128,6 @@ zeroit:
 	memset(kaddr + pgoff, 1, len);
 	flush_dcache_page(page);
 	kunmap_atomic(kaddr);
-	if (csum_expected == 0)
-		return 0;
 	return -EIO;
 }
 
