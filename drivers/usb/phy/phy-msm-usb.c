@@ -208,6 +208,7 @@ struct msm_otg {
 	struct regulator *v3p3;
 	struct regulator *v1p8;
 	struct regulator *vddcx;
+	struct regulator_bulk_data supplies[3];
 
 	struct reset_control *phy_rst;
 	struct reset_control *link_rst;
@@ -1813,7 +1814,6 @@ static int msm_otg_reboot_notify(struct notifier_block *this,
 
 static int msm_otg_probe(struct platform_device *pdev)
 {
-	struct regulator_bulk_data regs[3];
 	int ret = 0;
 	struct device_node *np = pdev->dev.of_node;
 	struct msm_otg_platform_data *pdata;
@@ -1900,17 +1900,18 @@ static int msm_otg_probe(struct platform_device *pdev)
 		goto unregister_extcon;
 	}
 
-	regs[0].supply = "vddcx";
-	regs[1].supply = "v3p3";
-	regs[2].supply = "v1p8";
+	motg->supplies[0].supply = "vddcx";
+	motg->supplies[1].supply = "v3p3";
+	motg->supplies[2].supply = "v1p8";
 
-	ret = devm_regulator_bulk_get(motg->phy.dev, ARRAY_SIZE(regs), regs);
+	ret = devm_regulator_bulk_get(motg->phy.dev, ARRAY_SIZE(motg->supplies),
+				      motg->supplies);
 	if (ret)
 		goto unregister_extcon;
 
-	motg->vddcx = regs[0].consumer;
-	motg->v3p3  = regs[1].consumer;
-	motg->v1p8  = regs[2].consumer;
+	motg->vddcx = motg->supplies[0].consumer;
+	motg->v3p3  = motg->supplies[1].consumer;
+	motg->v1p8  = motg->supplies[2].consumer;
 
 	clk_set_rate(motg->clk, 60000000);
 
