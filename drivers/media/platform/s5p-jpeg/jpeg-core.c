@@ -2730,6 +2730,8 @@ static irqreturn_t exynos4_jpeg_irq(int irq, void *priv)
 	if (jpeg->variant->version == SJPEG_EXYNOS4)
 		curr_ctx->subsampling = exynos4_jpeg_get_frame_fmt(jpeg->regs);
 
+	exynos4_jpeg_set_enc_dec_mode(jpeg->regs, S5P_JPEG_DISABLE);
+
 	spin_unlock(&jpeg->slock);
 	return IRQ_HANDLED;
 }
