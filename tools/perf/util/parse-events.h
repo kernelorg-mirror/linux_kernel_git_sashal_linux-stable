@@ -112,10 +112,7 @@ struct parse_events_evlist {
 	int			   nr_groups;
 	struct parse_events_error *error;
 	struct perf_evlist	  *evlist;
-};
-
-struct parse_events_terms {
-	struct list_head *terms;
+	struct list_head	  *terms;
 };
 
 void parse_events__shrink_config_terms(void);

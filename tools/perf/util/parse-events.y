@@ -484,7 +484,7 @@ opt_event_config:
 
 start_terms: event_config
 {
-	struct parse_events_terms *data = _data;
+	struct parse_events_state *data = _data;
 	data->terms = $1;
 }
 
