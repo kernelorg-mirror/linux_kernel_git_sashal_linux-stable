@@ -1870,7 +1870,7 @@ parser_init_byte_stream(u64 addr, u32 bytes, bool local, bool *retry)
 	return ctx;
 
 err_finish_ctx:
-	parser_done(ctx);
+	kfree(ctx);
 	return NULL;
 }
 
