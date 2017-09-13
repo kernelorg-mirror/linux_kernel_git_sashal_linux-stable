@@ -252,6 +252,7 @@ static netdev_tx_t mlx5e_sq_xmit(struct mlx5e_sq *sq, struct sk_buff *skb)
 			sq->stats.csum_partial_inner++;
 		} else {
 			eseg->cs_flags |= MLX5_ETH_WQE_L4_CSUM;
+			sq->stats.csum_partial++;
 		}
 	} else
 		sq->stats.csum_none++;
