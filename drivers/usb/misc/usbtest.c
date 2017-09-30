@@ -1972,6 +1972,9 @@ test_queue(struct usbtest_dev *dev, struct usbtest_param_32 *param,
 	int			status = 0;
 	struct urb		*urbs[param->sglen];
 
+	if (!param->sglen || param->iterations > UINT_MAX / param->sglen)
+		return -EINVAL;
+
 	memset(&context, 0, sizeof(context));
 	context.count = param->iterations * param->sglen;
 	context.dev = dev;
@@ -2094,6 +2097,8 @@ usbtest_do_ioctl(struct usb_interface *intf, struct usbtest_param_32 *param)
 	int	retval = -EOPNOTSUPP;
 
 	if (param->iterations <= 0)
+		return -EINVAL;
+	if (param->sglen > MAX_SGLEN)
 		return -EINVAL;
 	/*
 	 * Just a bunch of test cases that every HCD is expected to handle.
