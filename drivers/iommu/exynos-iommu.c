@@ -701,7 +701,7 @@ static const struct dev_pm_ops sysmmu_pm_ops = {
 	SET_LATE_SYSTEM_SLEEP_PM_OPS(exynos_sysmmu_suspend, exynos_sysmmu_resume)
 };
 
-static const struct of_device_id sysmmu_of_match[] __initconst = {
+static const struct of_device_id sysmmu_of_match[] = {
 	{ .compatible	= "samsung,exynos-sysmmu", },
 	{ },
 };
