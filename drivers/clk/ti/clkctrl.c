@@ -400,6 +400,12 @@ _ti_clkctrl_setup_subclks(struct omap_clkctrl_provider *provider,
 	}
 }
 
+static void __init _clkctrl_add_provider(void *data,
+					 struct device_node *np)
+{
+	of_clk_add_hw_provider(np, _ti_omap4_clkctrl_xlate, data);
+}
+
 static void __init _ti_omap4_clkctrl_setup(struct device_node *node)
 {
 	struct omap_clkctrl_provider *provider;
@@ -411,6 +417,7 @@ static void __init _ti_omap4_clkctrl_setup(struct device_node *node)
 	struct omap_clkctrl_clk *clkctrl_clk;
 	const __be32 *addrp;
 	u32 addr;
+	int ret;
 
 	addrp = of_get_address(node, 0, NULL, NULL);
 	addr = (u32)of_translate_address(node, addrp);
@@ -485,7 +492,10 @@ static void __init _ti_omap4_clkctrl_setup(struct device_node *node)
 		reg_data++;
 	}
 
-	of_clk_add_hw_provider(node, _ti_omap4_clkctrl_xlate, provider);
+	ret = of_clk_add_hw_provider(node, _ti_omap4_clkctrl_xlate, provider);
+	if (ret == -EPROBE_DEFER)
+		ti_clk_retry_init(node, provider, _clkctrl_add_provider);
+
 	return;
 
 cleanup:
