@@ -34,7 +34,7 @@ static void i2c_gpio_setsda_val(void *data, int state)
 {
 	struct i2c_gpio_private_data *priv = data;
 
-	gpiod_set_value(priv->sda, state);
+	gpiod_set_value_cansleep(priv->sda, state);
 }
 
 /*
@@ -47,21 +47,21 @@ static void i2c_gpio_setscl_val(void *data, int state)
 {
 	struct i2c_gpio_private_data *priv = data;
 
-	gpiod_set_value(priv->scl, state);
+	gpiod_set_value_cansleep(priv->scl, state);
 }
 
 static int i2c_gpio_getsda(void *data)
 {
 	struct i2c_gpio_private_data *priv = data;
 
-	return gpiod_get_value(priv->sda);
+	return gpiod_get_value_cansleep(priv->sda);
 }
 
 static int i2c_gpio_getscl(void *data)
 {
 	struct i2c_gpio_private_data *priv = data;
 
-	return gpiod_get_value(priv->scl);
+	return gpiod_get_value_cansleep(priv->scl);
 }
 
 static void of_i2c_gpio_get_props(struct device_node *np,
@@ -178,6 +178,9 @@ static int i2c_gpio_probe(struct platform_device *pdev)
 	priv->scl = i2c_gpio_get_desc(dev, "scl", 1, gflags);
 	if (IS_ERR(priv->scl))
 		return PTR_ERR(priv->scl);
+
+	if (gpiod_cansleep(priv->sda) || gpiod_cansleep(priv->scl))
+		dev_warn(dev, "Slow GPIO pins might wreak havoc into I2C/SMBus bus timing");
 
 	bit_data->setsda = i2c_gpio_setsda_val;
 	bit_data->setscl = i2c_gpio_setscl_val;
