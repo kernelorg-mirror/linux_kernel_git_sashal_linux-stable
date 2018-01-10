@@ -581,7 +581,7 @@ static int bcm_suspend_device(struct device *dev)
 	/* Suspend the device */
 	gpiod_set_value(bdev->device_wakeup, false);
 	bt_dev_dbg(bdev, "suspend, delaying 15 ms");
-	mdelay(15);
+	msleep(15);
 
 	return 0;
 }
@@ -594,7 +594,7 @@ static int bcm_resume_device(struct device *dev)
 
 	gpiod_set_value(bdev->device_wakeup, true);
 	bt_dev_dbg(bdev, "resume, delaying 15 ms");
-	mdelay(15);
+	msleep(15);
 
 	/* When this executes, the device has woken up already */
 	if (bdev->is_suspended && bdev->hu) {
