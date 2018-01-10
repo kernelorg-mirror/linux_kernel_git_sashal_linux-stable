@@ -2759,6 +2759,7 @@ static int tipc_sk_join(struct tipc_sock *tsk, struct tipc_group_req *mreq)
 	if (rc) {
 		tipc_group_delete(net, grp);
 		tsk->group = NULL;
+		return rc;
 	}
 
 	/* Eliminate any risk that a broadcast overtakes the sent JOIN */
