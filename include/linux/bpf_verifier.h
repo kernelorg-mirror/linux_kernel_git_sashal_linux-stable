@@ -163,6 +163,9 @@ struct bpf_verifier_env {
 	struct bpf_verifer_log log;
 };
 
+__printf(2, 3) void bpf_verifier_log_write(struct bpf_verifier_env *env,
+					   const char *fmt, ...);
+
 static inline struct bpf_reg_state *cur_regs(struct bpf_verifier_env *env)
 {
 	return env->cur_state->regs;
