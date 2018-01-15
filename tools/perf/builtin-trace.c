@@ -2344,7 +2344,7 @@ static int trace__run(struct trace *trace, int argc, const char **argv)
 		goto out_delete_evlist;
 	}
 
-	perf_evlist__config(evlist, &trace->opts, NULL);
+	perf_evlist__config(evlist, &trace->opts, &callchain_param);
 
 	if (callchain_param.enabled) {
 		bool use_identifier = false;
@@ -3097,8 +3097,9 @@ int cmd_trace(int argc, const char **argv)
 	}
 
 #ifdef HAVE_DWARF_UNWIND_SUPPORT
-	if ((trace.min_stack || max_stack_user_set) && !callchain_param.enabled && trace.trace_syscalls)
+	if ((trace.min_stack || max_stack_user_set) && !callchain_param.enabled) {
 		record_opts__parse_callchain(&trace.opts, &callchain_param, "dwarf", false);
+	}
 #endif
 
 	if (callchain_param.enabled) {
