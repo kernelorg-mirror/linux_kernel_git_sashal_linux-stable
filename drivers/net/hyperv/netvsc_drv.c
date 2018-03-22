@@ -849,9 +849,13 @@ drop:
 	u64_stats_update_end(&rx_stats->syncp);
 
 	napi_gro_receive(&nvchan->napi, skb);
+<<<<<<< HEAD
 	rcu_read_unlock();
 
 	return 0;
+=======
+	return NVSP_STAT_SUCCESS;
+>>>>>>> de50beb2e058... hv_netvsc: Fix the return status in RX path
 }
 
 static void netvsc_get_drvinfo(struct net_device *net,
