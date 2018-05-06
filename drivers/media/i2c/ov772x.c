@@ -1270,6 +1270,7 @@ static int ov772x_probe(struct i2c_client *client,
 	priv->info = client->dev.platform_data;
 
 	v4l2_i2c_subdev_init(&priv->subdev, client, &ov772x_subdev_ops);
+	priv->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	v4l2_ctrl_handler_init(&priv->hdl, 3);
 	v4l2_ctrl_new_std(&priv->hdl, &ov772x_ctrl_ops,
 			  V4L2_CID_VFLIP, 0, 1, 1, 0);
