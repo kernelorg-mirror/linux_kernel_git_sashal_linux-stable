@@ -9039,7 +9039,6 @@ static int parse_tc_actions(struct ixgbe_adapter *adapter,
 {
 	const struct tc_action *a;
 	LIST_HEAD(actions);
-	int err;
 
 	if (!tcf_exts_has_actions(exts))
 		return -EINVAL;
@@ -9060,11 +9059,11 @@ static int parse_tc_actions(struct ixgbe_adapter *adapter,
 
 			if (!dev)
 				return -EINVAL;
-			err = handle_redirect_action(adapter, dev->ifindex, queue,
-						     action);
-			if (err == 0)
-				return err;
+			return handle_redirect_action(adapter, dev->ifindex,
+						      queue, action);
 		}
+
+		return -EINVAL;
 	}
 
 	return -EINVAL;
