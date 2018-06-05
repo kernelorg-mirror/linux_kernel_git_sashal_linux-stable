@@ -1124,7 +1124,7 @@ int intel_guc_submission_init(struct intel_guc *guc)
 	WARN_ON(!guc_verify_doorbells(guc));
 	ret = guc_clients_create(guc);
 	if (ret)
-		return ret;
+		goto err_pool;
 
 	for_each_engine(engine, dev_priv, id) {
 		guc->preempt_work[id].engine = engine;
@@ -1133,6 +1133,9 @@ int intel_guc_submission_init(struct intel_guc *guc)
 
 	return 0;
 
+err_pool:
+	guc_stage_desc_pool_destroy(guc);
+	return ret;
 }
 
 void intel_guc_submission_fini(struct intel_guc *guc)
