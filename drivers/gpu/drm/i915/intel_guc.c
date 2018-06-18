@@ -272,6 +272,9 @@ void intel_guc_init_params(struct intel_guc *guc)
 		params[GUC_CTL_FEATURE] &= ~GUC_CTL_DISABLE_SCHEDULER;
 	}
 
+	for (i = 0; i < GUC_CTL_MAX_DWORDS; i++)
+		DRM_DEBUG_DRIVER("param[%2d] = %#x\n", i, params[i]);
+
 	/*
 	 * All SOFT_SCRATCH registers are in FORCEWAKE_BLITTER domain and
 	 * they are power context saved so it's ok to release forcewake
