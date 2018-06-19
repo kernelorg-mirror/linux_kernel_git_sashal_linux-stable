@@ -958,6 +958,7 @@ static void wl1271_recovery_work(struct work_struct *work)
 	}
 
 	wlcore_op_stop_locked(wl);
+	pm_runtime_put_sync(wl->dev);
 
 	ieee80211_restart_hw(wl->hw);
 
