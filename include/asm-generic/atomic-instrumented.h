@@ -368,6 +368,13 @@ cmpxchg_size(volatile void *ptr, unsigned long old, unsigned long new, int size)
 	return 0;
 }
 
+#define xchg(ptr, new)							\
+({									\
+	typeof(ptr) __ai_ptr = (ptr);					\
+	kasan_check_write(__ai_ptr, sizeof(*__ai_ptr));			\
+	arch_xchg(__ai_ptr, (new));					\
+})
+
 #define cmpxchg(ptr, old, new)						\
 ({									\
 	((__typeof__(*(ptr)))cmpxchg_size((ptr), (unsigned long)(old),	\
