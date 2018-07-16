@@ -769,7 +769,8 @@ static int register_process(struct device_queue_manager *dqm,
 
 	retval = dqm->asic_ops.update_qpd(dqm, qpd);
 
-	dqm->processes_count++;
+	if (dqm->processes_count++ == 0)
+		dqm->dev->kfd2kgd->set_compute_idle(dqm->dev->kgd, false);
 
 	mutex_unlock(&dqm->lock);
 
@@ -792,7 +793,9 @@ static int unregister_process(struct device_queue_manager *dqm,
 		if (qpd == cur->qpd) {
 			list_del(&cur->list);
 			kfree(cur);
-			dqm->processes_count--;
+			if (--dqm->processes_count == 0)
+				dqm->dev->kfd2kgd->set_compute_idle(
+					dqm->dev->kgd, true);
 			goto out;
 		}
 	}
