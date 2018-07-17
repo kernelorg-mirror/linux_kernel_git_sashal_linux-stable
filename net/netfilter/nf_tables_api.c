@@ -5539,6 +5539,7 @@ static void nf_tables_flowtable_destroy(struct nft_flowtable *flowtable)
 	flowtable->data.type->free(&flowtable->data);
 	rhashtable_destroy(&flowtable->data.rhashtable);
 	module_put(flowtable->data.type->owner);
+	kfree(flowtable);
 }
 
 static int nf_tables_fill_gen_info(struct sk_buff *skb, struct net *net,
