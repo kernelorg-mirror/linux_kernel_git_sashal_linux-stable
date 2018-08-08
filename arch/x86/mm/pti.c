@@ -563,4 +563,6 @@ void pti_finalize(void)
 	 * kernel text page tables are complete.
 	 */
 	pti_clone_kernel_text();
+
+	debug_checkwx_user();
 }
