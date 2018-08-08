@@ -6187,10 +6187,10 @@ static void ca0132_refresh_widget_caps(struct hda_codec *codec)
 }
 
 /*
- * Recon3Di r3di_setup_defaults sub functions.
+ * Recon3D r3d_setup_defaults sub functions.
  */
 
-static void r3di_dsp_scp_startup(struct hda_codec *codec)
+static void r3d_dsp_scp_startup(struct hda_codec *codec)
 {
 	unsigned int tmp;
 
@@ -6211,7 +6211,7 @@ static void r3di_dsp_scp_startup(struct hda_codec *codec)
 
 }
 
-static void r3di_dsp_initial_mic_setup(struct hda_codec *codec)
+static void r3d_dsp_initial_mic_setup(struct hda_codec *codec)
 {
 	unsigned int tmp;
 
@@ -6421,10 +6421,10 @@ static void ca0132_setup_defaults(struct hda_codec *codec)
 }
 
 /*
- * Setup default parameters for Recon3Di DSP.
+ * Setup default parameters for Recon3D/Recon3Di DSP.
  */
 
-static void r3di_setup_defaults(struct hda_codec *codec)
+static void r3d_setup_defaults(struct hda_codec *codec)
 {
 	struct ca0132_spec *spec = codec->spec;
 	unsigned int tmp;
@@ -6434,9 +6434,9 @@ static void r3di_setup_defaults(struct hda_codec *codec)
 	if (spec->dsp_state != DSP_DOWNLOADED)
 		return;
 
-	r3di_dsp_scp_startup(codec);
+	r3d_dsp_scp_startup(codec);
 
-	r3di_dsp_initial_mic_setup(codec);
+	r3d_dsp_initial_mic_setup(codec);
 
 	/*remove DSP headroom*/
 	tmp = FLOAT_ZERO;
@@ -6450,7 +6450,8 @@ static void r3di_setup_defaults(struct hda_codec *codec)
 	/* Set speaker source? */
 	dspio_set_uint_param(codec, 0x32, 0x00, tmp);
 
-	r3di_gpio_dsp_status_set(codec, R3DI_DSP_DOWNLOADED);
+	if (spec->quirk == QUIRK_R3DI)
+		r3di_gpio_dsp_status_set(codec, R3DI_DSP_DOWNLOADED);
 
 	/* Setup effect defaults */
 	num_fx = OUT_EFFECTS_COUNT + IN_EFFECTS_COUNT + 1;
@@ -6462,7 +6463,6 @@ static void r3di_setup_defaults(struct hda_codec *codec)
 					ca0132_effects[idx].def_vals[i]);
 		}
 	}
-
 }
 
 /*
@@ -7241,7 +7241,8 @@ static int ca0132_init(struct hda_codec *codec)
 
 	switch (spec->quirk) {
 	case QUIRK_R3DI:
-		r3di_setup_defaults(codec);
+	case QUIRK_R3D:
+		r3d_setup_defaults(codec);
 		break;
 	case QUIRK_SBZ:
 		break;
