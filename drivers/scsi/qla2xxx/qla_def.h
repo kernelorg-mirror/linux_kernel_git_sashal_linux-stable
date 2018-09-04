@@ -3345,6 +3345,9 @@ struct qla_qpair {
 	struct list_head hints_list;
 	struct list_head nvme_done_list;
 	uint16_t cpuid;
+	uint16_t retry_term_cnt;
+	uint32_t retry_term_exchg_addr;
+	uint64_t retry_term_jiff;
 	struct qla_tgt_counters tgt_counters;
 };
 
