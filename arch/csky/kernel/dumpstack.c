@@ -47,7 +47,11 @@ void show_stack(struct task_struct *task, unsigned long *stack)
 		if (task)
 			stack = (unsigned long *)task->thread.esp0;
 		else
+#ifdef CONFIG_STACKTRACE
+			asm volatile("mov %0, r8\n":"=r"(stack)::"memory");
+#else
 			stack = (unsigned long *)&stack;
+#endif
 	}
 	endstack = (unsigned long *)
 		(((unsigned long)stack + THREAD_SIZE - 1) & -THREAD_SIZE);
