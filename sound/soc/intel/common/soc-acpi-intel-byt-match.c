@@ -176,6 +176,14 @@ struct snd_soc_acpi_mach  snd_soc_acpi_intel_baytrail_machines[] = {
 		.sof_tplg_filename = "intel/sof-byt-max98090.tplg",
 		.asoc_plat_name = "sst-mfld-platform",
 	},
+	{
+		.id = "14F10720",
+		.drv_name = "bytcht_cx2072x",
+		.fw_filename = "intel/fw_sst_0f28.bin",
+		.board = "bytcht_cx2072x",
+		.sof_fw_filename = "sof-byt.ri",
+		.sof_tplg_filename = "sof-byt-cx2072x.tplg",
+	},
 #if IS_ENABLED(CONFIG_SND_SOC_INTEL_BYT_CHT_NOCODEC_MACH)
 	/*
 	 * This is always last in the table so that it is selected only when
