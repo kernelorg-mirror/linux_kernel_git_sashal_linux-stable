@@ -335,7 +335,7 @@ int snd_tscm_stream_init_duplex(struct snd_tscm *tscm)
 	return err;
 }
 
-/* At bus reset, streaming is stopped and some registers are clear. */
+// At bus reset, streaming is stopped and some registers are clear.
 void snd_tscm_stream_update_duplex(struct snd_tscm *tscm)
 {
 	amdtp_stream_pcm_abort(&tscm->tx_stream);
@@ -404,6 +404,7 @@ void snd_tscm_stream_release_duplex(struct snd_tscm *tscm)
 
 int snd_tscm_stream_start_duplex(struct snd_tscm *tscm, unsigned int rate)
 {
+	unsigned int generation = tscm->rx_resources.generation;
 	int err;
 
 	if (tscm->substreams_counter == 0)
@@ -415,6 +416,16 @@ int snd_tscm_stream_start_duplex(struct snd_tscm *tscm, unsigned int rate)
 		amdtp_stream_stop(&tscm->tx_stream);
 
 		finish_session(tscm);
+	}
+
+	if (generation != fw_parent_device(tscm->unit)->card->generation) {
+		err = fw_iso_resources_update(&tscm->tx_resources);
+		if (err < 0)
+			goto error;
+
+		err = fw_iso_resources_update(&tscm->rx_resources);
+		if (err < 0)
+			goto error;
 	}
 
 	if (!amdtp_stream_running(&tscm->rx_stream)) {
