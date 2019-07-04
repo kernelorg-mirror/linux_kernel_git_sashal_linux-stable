@@ -369,11 +369,12 @@ static void hsr_dev_destroy(struct net_device *hsr_dev)
 {
 	struct hsr_priv *hsr;
 	struct hsr_port *port;
+	struct hsr_port *tmp;
 
 	hsr = netdev_priv(hsr_dev);
 
 	rtnl_lock();
-	hsr_for_each_port(hsr, port)
+	list_for_each_entry_safe(port, tmp, &hsr->ports, port_list)
 		hsr_del_port(port);
 	rtnl_unlock();
 
@@ -445,6 +446,7 @@ int hsr_dev_finalize(struct net_device *hsr_dev, struct net_device *slave[2],
 {
 	struct hsr_priv *hsr;
 	struct hsr_port *port;
+	struct hsr_port *tmp;
 	int res;
 
 	hsr = netdev_priv(hsr_dev);
@@ -506,7 +508,7 @@ int hsr_dev_finalize(struct net_device *hsr_dev, struct net_device *slave[2],
 	return 0;
 
 fail:
-	hsr_for_each_port(hsr, port)
+	list_for_each_entry_safe(port, tmp, &hsr->ports, port_list)
 		hsr_del_port(port);
 err_add_port:
 	hsr_del_node(&hsr->self_node_db);
