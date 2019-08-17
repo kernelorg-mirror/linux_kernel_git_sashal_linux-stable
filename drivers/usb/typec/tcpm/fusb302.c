@@ -1753,6 +1753,7 @@ static int fusb302_probe(struct i2c_client *client,
 	INIT_WORK(&chip->irq_work, fusb302_irq_work);
 	INIT_DELAYED_WORK(&chip->bc_lvl_handler, fusb302_bc_lvl_handler_work);
 	init_tcpc_dev(&chip->tcpc_dev);
+	fusb302_debugfs_init(chip);
 
 	if (client->irq) {
 		chip->gpio_int_n_irq = client->irq;
@@ -1778,7 +1779,6 @@ static int fusb302_probe(struct i2c_client *client,
 		goto tcpm_unregister_port;
 	}
 	enable_irq_wake(chip->gpio_int_n_irq);
-	fusb302_debugfs_init(chip);
 	i2c_set_clientdata(client, chip);
 
 	return ret;
@@ -1786,6 +1786,7 @@ static int fusb302_probe(struct i2c_client *client,
 tcpm_unregister_port:
 	tcpm_unregister_port(chip->tcpm_port);
 destroy_workqueue:
+	fusb302_debugfs_exit(chip);
 	destroy_workqueue(chip->wq);
 
 	return ret;
