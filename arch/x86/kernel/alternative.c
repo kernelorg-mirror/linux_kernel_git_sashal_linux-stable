@@ -959,9 +959,9 @@ static struct bp_patching_desc *bp_desc;
 
 static inline struct bp_patching_desc *try_get_desc(struct bp_patching_desc **descp)
 {
-	struct bp_patching_desc *desc = READ_ONCE(*descp); /* rcu_dereference */
+	struct bp_patching_desc *desc = __READ_ONCE(*descp); /* rcu_dereference */
 
-	if (!desc || !atomic_inc_not_zero(&desc->refs))
+	if (!desc || !arch_atomic_inc_not_zero(&desc->refs))
 		return NULL;
 
 	return desc;
@@ -970,7 +970,7 @@ static inline struct bp_patching_desc *try_get_desc(struct bp_patching_desc **de
 static inline void put_desc(struct bp_patching_desc *desc)
 {
 	smp_mb__before_atomic();
-	atomic_dec(&desc->refs);
+	arch_atomic_dec(&desc->refs);
 }
 
 static inline void *text_poke_addr(struct text_poke_loc *tp)
