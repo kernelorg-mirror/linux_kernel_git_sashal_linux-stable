@@ -1019,6 +1019,8 @@ struct dc_sink {
 
 	struct dc_sink_dsc_caps sink_dsc_caps;
 
+	bool is_vsc_sdp_colorimetry_supported;
+
 	/* private to DC core */
 	struct dc_link *link;
 	struct dc_context *ctx;
