@@ -146,6 +146,10 @@ struct mt7615_phy {
 	u32 ampdu_ref;
 
 	struct mib_stats mib;
+
+	struct delayed_work mac_work;
+	u8 mac_work_count;
+
 };
 
 #define mt7615_mcu_add_tx_ba(dev, ...)	(dev)->mcu_ops->add_tx_ba((dev), __VA_ARGS__)
@@ -208,7 +212,6 @@ struct mt7615_dev {
 	} radar_pattern;
 	u32 hw_pattern;
 
-	u8 mac_work_count;
 	bool scs_en;
 	bool fw_debug;
 
