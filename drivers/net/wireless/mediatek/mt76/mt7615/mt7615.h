@@ -12,8 +12,9 @@
 
 #define MT7615_MAX_INTERFACES		4
 #define MT7615_MAX_WMM_SETS		4
+#define MT7663_WTBL_SIZE		32
 #define MT7615_WTBL_SIZE		128
-#define MT7615_WTBL_RESERVED		(MT7615_WTBL_SIZE - 1)
+#define MT7615_WTBL_RESERVED		(mt7615_wtbl_size(dev) - 1)
 #define MT7615_WTBL_STA			(MT7615_WTBL_RESERVED - \
 					 MT7615_MAX_INTERFACES)
 
@@ -364,6 +365,14 @@ static inline void mt7615_irq_enable(struct mt7615_dev *dev, u32 mask)
 static inline void mt7615_irq_disable(struct mt7615_dev *dev, u32 mask)
 {
 	mt76_set_irq_mask(&dev->mt76, MT_INT_MASK_CSR, mask, 0);
+}
+
+static inline u16 mt7615_wtbl_size(struct mt7615_dev *dev)
+{
+	if (is_mt7663(&dev->mt76) && mt7615_firmware_offload(dev))
+		return MT7663_WTBL_SIZE;
+	else
+		return MT7615_WTBL_SIZE;
 }
 
 void mt7615_update_channel(struct mt76_dev *mdev);
