@@ -1231,7 +1231,7 @@ mt7615_mcu_uni_add_bss(struct mt7615_dev *dev,
 			.active = enable,
 		},
 	};
-	u8 idx, tx_wlan_idx = 0;
+	u8 idx;
 
 	idx = mvif->omac_idx > EXT_BSSID_START ? HW_BSSID_0 : mvif->omac_idx;
 	req.basic.hw_bss_idx = idx;
@@ -1240,24 +1240,8 @@ mt7615_mcu_uni_add_bss(struct mt7615_dev *dev,
 	case NL80211_IFTYPE_MESH_POINT:
 	case NL80211_IFTYPE_AP:
 		req.basic.conn_type = cpu_to_le32(CONNECTION_INFRA_AP);
-		tx_wlan_idx = mvif->sta.wcid.idx;
 		break;
 	case NL80211_IFTYPE_STATION:
-		if (enable) {
-			struct ieee80211_sta *sta;
-			struct mt7615_sta *msta;
-
-			rcu_read_lock();
-			sta = ieee80211_find_sta(vif, vif->bss_conf.bssid);
-			if (!sta) {
-				rcu_read_unlock();
-				return -EINVAL;
-			}
-
-			msta = (struct mt7615_sta *)sta->drv_priv;
-			tx_wlan_idx = msta->wcid.idx;
-			rcu_read_unlock();
-		}
 		req.basic.conn_type = cpu_to_le32(CONNECTION_INFRA_STA);
 		break;
 	case NL80211_IFTYPE_ADHOC:
@@ -1269,8 +1253,8 @@ mt7615_mcu_uni_add_bss(struct mt7615_dev *dev,
 	}
 
 	memcpy(req.basic.bssid, vif->bss_conf.bssid, ETH_ALEN);
-	req.basic.bmc_tx_wlan_idx = cpu_to_le16(tx_wlan_idx);
-	req.basic.sta_idx = cpu_to_le16(tx_wlan_idx);
+	req.basic.bmc_tx_wlan_idx = cpu_to_le16(mvif->sta.wcid.idx);
+	req.basic.sta_idx = cpu_to_le16(mvif->sta.wcid.idx);
 	req.basic.conn_state = !enable;
 
 	return __mt76_mcu_send_msg(&dev->mt76, MCU_UNI_CMD_BSS_INFO_UPDATE,
