@@ -2096,6 +2096,7 @@ static int process_attr(struct perf_tool *tool, union perf_event *event,
 	struct perf_script *scr = container_of(tool, struct perf_script, tool);
 	struct evlist *evlist;
 	struct evsel *evsel, *pos;
+	u64 sample_type;
 	int err;
 	static struct evsel_script *es;
 
@@ -2130,10 +2131,19 @@ static int process_attr(struct perf_tool *tool, union perf_event *event,
 
 	set_print_ip_opts(&evsel->core.attr);
 
-	if (evsel->core.attr.sample_type)
+	if (evsel->core.attr.sample_type) {
 		err = perf_evsel__check_attr(evsel, scr->session);
+		if (err)
+			return err;
+	}
 
-	return err;
+	/*
+	 * Check if we need to enable callchains based
+	 * on events sample_type.
+	 */
+	sample_type = perf_evlist__combined_sample_type(evlist);
+	callchain_param_setup(sample_type);
+	return 0;
 }
 
 static int process_comm_event(struct perf_tool *tool,
