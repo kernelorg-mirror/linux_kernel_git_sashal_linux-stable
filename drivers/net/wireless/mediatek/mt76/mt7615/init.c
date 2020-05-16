@@ -399,8 +399,6 @@ int mt7615_register_ext_phy(struct mt7615_dev *dev)
 	if (phy)
 		return 0;
 
-	INIT_DELAYED_WORK(&phy->mac_work, mt7615_mac_work);
-
 	mt7615_cap_dbdc_enable(dev);
 	mphy = mt76_alloc_phy(&dev->mt76, sizeof(*phy), &mt7615_ops);
 	if (!mphy)
@@ -412,6 +410,8 @@ int mt7615_register_ext_phy(struct mt7615_dev *dev)
 	phy->chainmask = dev->chainmask & ~dev->phy.chainmask;
 	mphy->antenna_mask = BIT(hweight8(phy->chainmask)) - 1;
 	mt7615_init_wiphy(mphy->hw);
+
+	INIT_DELAYED_WORK(&phy->mac_work, mt7615_mac_work);
 
 	/*
 	 * Make the secondary PHY MAC address local without overlapping with
