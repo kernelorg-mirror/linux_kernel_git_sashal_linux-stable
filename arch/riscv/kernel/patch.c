@@ -10,6 +10,7 @@
 #include <asm/kprobes.h>
 #include <asm/cacheflush.h>
 #include <asm/fixmap.h>
+#include <asm/patch.h>
 
 struct riscv_insn_patch {
 	void *addr;
