@@ -1171,10 +1171,10 @@ static struct nexthop *nexthop_create_group(struct net *net,
 
 	/* spare group used for removals */
 	nhg->spare = nexthop_grp_alloc(num_nh);
-	if (!nhg) {
+	if (!nhg->spare) {
 		kfree(nhg);
 		kfree(nh);
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 	nhg->spare->spare = nhg;
 
