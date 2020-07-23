@@ -397,16 +397,14 @@ static int sdm845_snd_platform_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	int ret;
 
-	card = kzalloc(sizeof(*card), GFP_KERNEL);
+	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
 	if (!card)
 		return -ENOMEM;
 
 	/* Allocate the private data */
-	data = kzalloc(sizeof(*data), GFP_KERNEL);
-	if (!data) {
-		ret = -ENOMEM;
-		goto data_alloc_fail;
-	}
+	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
 
 	card->driver_name = DRIVER_NAME;
 	card->dapm_widgets = sdm845_snd_widgets;
@@ -416,38 +414,13 @@ static int sdm845_snd_platform_probe(struct platform_device *pdev)
 	dev_set_drvdata(dev, card);
 	ret = qcom_snd_parse_of(card);
 	if (ret)
-		goto parse_dt_fail;
+		return ret;
 
 	data->card = card;
 	snd_soc_card_set_drvdata(card, data);
 
 	sdm845_add_ops(card);
-	ret = snd_soc_register_card(card);
-	if (ret) {
-		dev_err(dev, "Sound card registration failed\n");
-		goto register_card_fail;
-	}
-	return ret;
-
-register_card_fail:
-	kfree(card->dai_link);
-parse_dt_fail:
-	kfree(data);
-data_alloc_fail:
-	kfree(card);
-	return ret;
-}
-
-static int sdm845_snd_platform_remove(struct platform_device *pdev)
-{
-	struct snd_soc_card *card = dev_get_drvdata(&pdev->dev);
-	struct sdm845_snd_data *data = snd_soc_card_get_drvdata(card);
-
-	snd_soc_unregister_card(card);
-	kfree(card->dai_link);
-	kfree(data);
-	kfree(card);
-	return 0;
+	return devm_snd_soc_register_card(dev, card);
 }
 
 static const struct of_device_id sdm845_snd_device_id[]  = {
@@ -458,7 +431,6 @@ MODULE_DEVICE_TABLE(of, sdm845_snd_device_id);
 
 static struct platform_driver sdm845_snd_driver = {
 	.probe = sdm845_snd_platform_probe,
-	.remove = sdm845_snd_platform_remove,
 	.driver = {
 		.name = "msm-snd-sdm845",
 		.of_match_table = sdm845_snd_device_id,
