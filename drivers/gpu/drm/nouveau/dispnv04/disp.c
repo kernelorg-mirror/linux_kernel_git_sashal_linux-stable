@@ -36,8 +36,9 @@
 #include <nvif/if0004.h>
 
 static void
-nv04_display_fini(struct drm_device *dev, bool suspend)
+nv04_display_fini(struct drm_device *dev, bool runtime, bool suspend)
 {
+	struct nouveau_drm *drm = nouveau_drm(dev);
 	struct nv04_display *disp = nv04_display(dev);
 	struct drm_crtc *crtc;
 
@@ -48,6 +49,9 @@ nv04_display_fini(struct drm_device *dev, bool suspend)
 	NVWriteCRTC(dev, 0, NV_PCRTC_INTR_EN_0, 0);
 	if (nv_two_heads(dev))
 		NVWriteCRTC(dev, 1, NV_PCRTC_INTR_EN_0, 0);
+
+	if (!runtime)
+		cancel_work_sync(&drm->hpd_work);
 
 	if (!suspend)
 		return;
