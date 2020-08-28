@@ -273,16 +273,10 @@ out:
 		return count;
 	}
 
+	*ui = t;
 
-	if (!strcmp(a->attr.name, "iostat_enable")) {
-		sbi->iostat_enable = !!t;
-		if (!sbi->iostat_enable)
-			f2fs_reset_iostat(sbi);
-		return count;
-	}
-
-	*ui = (unsigned int)t;
-
+	if (!strcmp(a->attr.name, "iostat_enable") && *ui == 0)
+		f2fs_reset_iostat(sbi);
 	return count;
 }
 

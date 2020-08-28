@@ -31,7 +31,6 @@
 #include <linux/types.h>
 #include <linux/io.h>
 #include <linux/pci.h>
-#include <asm/io.h>
 #include <sound/core.h>
 #include "hda_codec.h"
 #include "hda_local.h"
@@ -4521,7 +4520,7 @@ static int ca0132_effects_set(struct hda_codec *codec, hda_nid_t nid, long val)
 			val = 0;
 
 		/* If Voice Focus on SBZ, set to two channel. */
-		if ((nid == VOICE_FOCUS) && (spec->use_pci_mmio)
+		if ((nid == VOICE_FOCUS) && (spec->quirk == QUIRK_SBZ)
 				&& (spec->cur_mic_type != REAR_LINE_IN)) {
 			if (spec->effects_switch[CRYSTAL_VOICE -
 						 EFFECT_START_NID]) {
@@ -4540,7 +4539,7 @@ static int ca0132_effects_set(struct hda_codec *codec, hda_nid_t nid, long val)
 		 * For SBZ noise reduction, there's an extra command
 		 * to module ID 0x47. No clue why.
 		 */
-		if ((nid == NOISE_REDUCTION) && (spec->use_pci_mmio)
+		if ((nid == NOISE_REDUCTION) && (spec->quirk == QUIRK_SBZ)
 				&& (spec->cur_mic_type != REAR_LINE_IN)) {
 			if (spec->effects_switch[CRYSTAL_VOICE -
 						 EFFECT_START_NID]) {
@@ -5856,8 +5855,8 @@ static int ca0132_build_controls(struct hda_codec *codec)
 	 */
 	num_fx = OUT_EFFECTS_COUNT + IN_EFFECTS_COUNT;
 	for (i = 0; i < num_fx; i++) {
-		/* Desktop cards break if Echo Cancellation is used. */
-		if (spec->use_pci_mmio) {
+		/* SBZ and R3D break if Echo Cancellation is used. */
+		if (spec->quirk == QUIRK_SBZ || spec->quirk == QUIRK_R3D) {
 			if (i == (ECHO_CANCELLATION - IN_EFFECT_START_NID +
 						OUT_EFFECTS_COUNT))
 				continue;
@@ -6770,7 +6769,7 @@ static void hp_callback(struct hda_codec *codec, struct hda_jack_callback *cb)
 	/* Delay enabling the HP amp, to let the mic-detection
 	 * state machine run.
 	 */
-	cancel_delayed_work(&spec->unsol_hp_work);
+	cancel_delayed_work_sync(&spec->unsol_hp_work);
 	schedule_delayed_work(&spec->unsol_hp_work, msecs_to_jiffies(500));
 	tbl = snd_hda_jack_tbl_get(codec, cb->nid);
 	if (tbl)
@@ -7395,10 +7394,8 @@ static void ca0132_free(struct hda_codec *codec)
 	ca0132_exit_chip(codec);
 
 	snd_hda_power_down(codec);
-#ifdef CONFIG_PCI
 	if (spec->mem_base)
-		pci_iounmap(codec->bus->pci, spec->mem_base);
-#endif
+		iounmap(spec->mem_base);
 	kfree(spec->spec_init_verbs);
 	kfree(codec->spec);
 }

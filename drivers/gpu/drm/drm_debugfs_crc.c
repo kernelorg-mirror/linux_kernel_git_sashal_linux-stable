@@ -379,13 +379,12 @@ int drm_crtc_add_crc_entry(struct drm_crtc *crtc, bool has_frame,
 	struct drm_crtc_crc *crc = &crtc->crc;
 	struct drm_crtc_crc_entry *entry;
 	int head, tail;
-	unsigned long flags;
 
-	spin_lock_irqsave(&crc->lock, flags);
+	spin_lock(&crc->lock);
 
 	/* Caller may not have noticed yet that userspace has stopped reading */
 	if (!crc->entries) {
-		spin_unlock_irqrestore(&crc->lock, flags);
+		spin_unlock(&crc->lock);
 		return -EINVAL;
 	}
 
@@ -396,7 +395,7 @@ int drm_crtc_add_crc_entry(struct drm_crtc *crtc, bool has_frame,
 		bool was_overflow = crc->overflow;
 
 		crc->overflow = true;
-		spin_unlock_irqrestore(&crc->lock, flags);
+		spin_unlock(&crc->lock);
 
 		if (!was_overflow)
 			DRM_ERROR("Overflow of CRC buffer, userspace reads too slow.\n");
@@ -412,7 +411,7 @@ int drm_crtc_add_crc_entry(struct drm_crtc *crtc, bool has_frame,
 	head = (head + 1) & (DRM_CRC_ENTRIES_NR - 1);
 	crc->head = head;
 
-	spin_unlock_irqrestore(&crc->lock, flags);
+	spin_unlock(&crc->lock);
 
 	wake_up_interruptible(&crc->wq);
 

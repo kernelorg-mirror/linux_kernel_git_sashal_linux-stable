@@ -1616,7 +1616,7 @@ xfs_ioc_getbmap(
 	error = 0;
 out_free_buf:
 	kmem_free(buf);
-	return error;
+	return 0;
 }
 
 struct getfsmap_info {

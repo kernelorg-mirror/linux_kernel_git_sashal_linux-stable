@@ -448,8 +448,6 @@ static bool synth_field_signed(char *type)
 {
 	if (strncmp(type, "u", 1) == 0)
 		return false;
-	if (strcmp(type, "gfp_t") == 0)
-		return false;
 
 	return true;
 }
@@ -1065,10 +1063,8 @@ static int create_synth_event(int argc, char **argv)
 		event = NULL;
 		ret = -EEXIST;
 		goto out;
-	} else if (delete_event) {
-		ret = -ENOENT;
+	} else if (delete_event)
 		goto out;
-	}
 
 	if (argc < 2) {
 		ret = -EINVAL;
@@ -1633,9 +1629,6 @@ static u64 hist_field_var_ref(struct hist_field *hist_field,
 {
 	struct hist_elt_data *elt_data;
 	u64 var_val = 0;
-
-	if (WARN_ON_ONCE(!elt))
-		return var_val;
 
 	elt_data = elt->private_data;
 	var_val = elt_data->var_ref_vals[hist_field->var_ref_idx];
@@ -2527,8 +2520,6 @@ static struct hist_field *create_alias(struct hist_trigger_data *hist_data,
 		destroy_hist_field(alias, 0);
 		return NULL;
 	}
-
-	alias->var_ref_idx = var_ref->var_ref_idx;
 
 	return alias;
 }
@@ -4628,10 +4619,9 @@ static inline void add_to_key(char *compound_key, void *key,
 		/* ensure NULL-termination */
 		if (size > key_field->size - 1)
 			size = key_field->size - 1;
+	}
 
-		strncpy(compound_key + key_field->offset, (char *)key, size);
-	} else
-		memcpy(compound_key + key_field->offset, key, size);
+	memcpy(compound_key + key_field->offset, key, size);
 }
 
 static void

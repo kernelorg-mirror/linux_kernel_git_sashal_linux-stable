@@ -483,7 +483,6 @@ static DECLARE_DELAYED_WORK(optimizing_work, kprobe_optimizer);
  */
 static void do_optimize_kprobes(void)
 {
-	lockdep_assert_held(&text_mutex);
 	/*
 	 * The optimization/unoptimization refers online_cpus via
 	 * stop_machine() and cpu-hotplug modifies online_cpus.
@@ -501,7 +500,9 @@ static void do_optimize_kprobes(void)
 	    list_empty(&optimizing_list))
 		return;
 
+	mutex_lock(&text_mutex);
 	arch_optimize_kprobes(&optimizing_list);
+	mutex_unlock(&text_mutex);
 }
 
 /*
@@ -512,7 +513,6 @@ static void do_unoptimize_kprobes(void)
 {
 	struct optimized_kprobe *op, *tmp;
 
-	lockdep_assert_held(&text_mutex);
 	/* See comment in do_optimize_kprobes() */
 	lockdep_assert_cpus_held();
 
@@ -520,6 +520,7 @@ static void do_unoptimize_kprobes(void)
 	if (list_empty(&unoptimizing_list))
 		return;
 
+	mutex_lock(&text_mutex);
 	arch_unoptimize_kprobes(&unoptimizing_list, &freeing_list);
 	/* Loop free_list for disarming */
 	list_for_each_entry_safe(op, tmp, &freeing_list, list) {
@@ -536,6 +537,7 @@ static void do_unoptimize_kprobes(void)
 		} else
 			list_del_init(&op->list);
 	}
+	mutex_unlock(&text_mutex);
 }
 
 /* Reclaim all kprobes on the free_list */
@@ -544,14 +546,8 @@ static void do_free_cleaned_kprobes(void)
 	struct optimized_kprobe *op, *tmp;
 
 	list_for_each_entry_safe(op, tmp, &freeing_list, list) {
+		BUG_ON(!kprobe_unused(&op->kp));
 		list_del_init(&op->list);
-		if (WARN_ON_ONCE(!kprobe_unused(&op->kp))) {
-			/*
-			 * This must not happen, but if there is a kprobe
-			 * still in use, keep it on kprobes hash list.
-			 */
-			continue;
-		}
 		free_aggr_kprobe(&op->kp);
 	}
 }
@@ -567,7 +563,6 @@ static void kprobe_optimizer(struct work_struct *work)
 {
 	mutex_lock(&kprobe_mutex);
 	cpus_read_lock();
-	mutex_lock(&text_mutex);
 	/* Lock modules while optimizing kprobes */
 	mutex_lock(&module_mutex);
 
@@ -595,7 +590,6 @@ static void kprobe_optimizer(struct work_struct *work)
 	do_free_cleaned_kprobes();
 
 	mutex_unlock(&module_mutex);
-	mutex_unlock(&text_mutex);
 	cpus_read_unlock();
 	mutex_unlock(&kprobe_mutex);
 
@@ -706,7 +700,7 @@ static void unoptimize_kprobe(struct kprobe *p, bool force)
 }
 
 /* Cancel unoptimizing for reusing */
-static int reuse_unused_kprobe(struct kprobe *ap)
+static void reuse_unused_kprobe(struct kprobe *ap)
 {
 	struct optimized_kprobe *op;
 
@@ -720,11 +714,8 @@ static int reuse_unused_kprobe(struct kprobe *ap)
 	/* Enable the probe again */
 	ap->flags &= ~KPROBE_FLAG_DISABLED;
 	/* Optimize it again (remove from op->list) */
-	if (!kprobe_optready(ap))
-		return -EINVAL;
-
+	BUG_ON(!kprobe_optready(ap));
 	optimize_kprobe(ap);
-	return 0;
 }
 
 /* Remove optimized instructions */
@@ -949,16 +940,11 @@ static void __disarm_kprobe(struct kprobe *p, bool reopt)
 #define kprobe_disarmed(p)			kprobe_disabled(p)
 #define wait_for_kprobe_optimizer()		do {} while (0)
 
-static int reuse_unused_kprobe(struct kprobe *ap)
+/* There should be no unused kprobes can be reused without optimization */
+static void reuse_unused_kprobe(struct kprobe *ap)
 {
-	/*
-	 * If the optimized kprobe is NOT supported, the aggr kprobe is
-	 * released at the same time that the last aggregated kprobe is
-	 * unregistered.
-	 * Thus there should be no chance to reuse unused kprobe.
-	 */
 	printk(KERN_ERR "Error: There should be no unused kprobe here.\n");
-	return -EINVAL;
+	BUG_ON(kprobe_unused(ap));
 }
 
 static void free_aggr_kprobe(struct kprobe *p)
@@ -1332,12 +1318,9 @@ static int register_aggr_kprobe(struct kprobe *orig_p, struct kprobe *p)
 			goto out;
 		}
 		init_aggr_kprobe(ap, orig_p);
-	} else if (kprobe_unused(ap)) {
+	} else if (kprobe_unused(ap))
 		/* This probe is going to die. Rescue it */
-		ret = reuse_unused_kprobe(ap);
-		if (ret)
-			goto out;
-	}
+		reuse_unused_kprobe(ap);
 
 	if (kprobe_gone(ap)) {
 		/*
@@ -1511,8 +1494,7 @@ static int check_kprobe_address_safe(struct kprobe *p,
 	/* Ensure it is not in reserved area nor out of text */
 	if (!kernel_text_address((unsigned long) p->addr) ||
 	    within_kprobe_blacklist((unsigned long) p->addr) ||
-	    jump_label_text_reserved(p->addr, p->addr) ||
-	    find_bug((unsigned long)p->addr)) {
+	    jump_label_text_reserved(p->addr, p->addr)) {
 		ret = -EINVAL;
 		goto out;
 	}

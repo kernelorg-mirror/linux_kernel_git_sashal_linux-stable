@@ -2240,8 +2240,7 @@ static void get_active_converter_info(
 					translate_dpcd_max_bpc(
 						hdmi_color_caps.bits.MAX_BITS_PER_COLOR_COMPONENT);
 
-				if (link->dpcd_caps.dongle_caps.dp_hdmi_max_pixel_clk != 0)
-					link->dpcd_caps.dongle_caps.extendedCapValid = true;
+				link->dpcd_caps.dongle_caps.extendedCapValid = true;
 			}
 
 			break;

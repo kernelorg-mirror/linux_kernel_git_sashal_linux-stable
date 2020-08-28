@@ -2055,12 +2055,6 @@ static int setup_nodes(struct perf_session *session)
 		if (!set)
 			return -ENOMEM;
 
-		nodes[node] = set;
-
-		/* empty node, skip */
-		if (cpu_map__empty(map))
-			continue;
-
 		for (cpu = 0; cpu < map->nr; cpu++) {
 			set_bit(map->map[cpu], set);
 
@@ -2069,6 +2063,8 @@ static int setup_nodes(struct perf_session *session)
 
 			cpu2node[map->map[cpu]] = node;
 		}
+
+		nodes[node] = set;
 	}
 
 	setup_nodes_header();
@@ -2626,7 +2622,6 @@ static int build_cl_output(char *cl_sort, bool no_source)
 	bool add_sym   = false;
 	bool add_dso   = false;
 	bool add_src   = false;
-	int ret = 0;
 
 	if (!buf)
 		return -ENOMEM;
@@ -2645,8 +2640,7 @@ static int build_cl_output(char *cl_sort, bool no_source)
 			add_dso = true;
 		} else if (strcmp(tok, "offset")) {
 			pr_err("unrecognized sort token: %s\n", tok);
-			ret = -EINVAL;
-			goto err;
+			return -EINVAL;
 		}
 	}
 
@@ -2669,15 +2663,13 @@ static int build_cl_output(char *cl_sort, bool no_source)
 		add_sym ? "symbol," : "",
 		add_dso ? "dso," : "",
 		add_src ? "cl_srcline," : "",
-		"node") < 0) {
-		ret = -ENOMEM;
-		goto err;
-	}
+		"node") < 0)
+		return -ENOMEM;
 
 	c2c.show_src = add_src;
-err:
+
 	free(buf);
-	return ret;
+	return 0;
 }
 
 static int setup_coalesce(const char *coalesce, bool no_source)

@@ -539,8 +539,7 @@ r9a06g032_div_round_rate(struct clk_hw *hw,
 	 * several uarts attached to this divider, and changing this impacts
 	 * everyone.
 	 */
-	if (clk->index == R9A06G032_DIV_UART ||
-	    clk->index == R9A06G032_DIV_P2_PG) {
+	if (clk->index == R9A06G032_DIV_UART) {
 		pr_devel("%s div uart hack!\n", __func__);
 		return clk_get_rate(hw->clk);
 	}

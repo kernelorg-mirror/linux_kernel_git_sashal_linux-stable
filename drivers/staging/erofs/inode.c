@@ -132,13 +132,7 @@ static int fill_inline_data(struct inode *inode, void *data, unsigned m_pofs)
 			return -ENOMEM;
 
 		m_pofs += vi->inode_isize + vi->xattr_isize;
-
-		/* inline symlink data shouldn't across page boundary as well */
-		if (unlikely(m_pofs + inode->i_size > PAGE_SIZE)) {
-			DBG_BUGON(1);
-			kfree(lnk);
-			return -EIO;
-		}
+		BUG_ON(m_pofs + inode->i_size > PAGE_SIZE);
 
 		/* get in-page inline data */
 		memcpy(lnk, data + m_pofs, inode->i_size);
@@ -176,7 +170,7 @@ static int fill_inode(struct inode *inode, int isdir)
 		return PTR_ERR(page);
 	}
 
-	DBG_BUGON(!PageUptodate(page));
+	BUG_ON(!PageUptodate(page));
 	data = page_address(page);
 
 	err = read_inode(inode, data + ofs);
@@ -184,16 +178,16 @@ static int fill_inode(struct inode *inode, int isdir)
 		/* setup the new inode */
 		if (S_ISREG(inode->i_mode)) {
 #ifdef CONFIG_EROFS_FS_XATTR
-			inode->i_op = &erofs_generic_xattr_iops;
+			if (vi->xattr_isize)
+				inode->i_op = &erofs_generic_xattr_iops;
 #endif
 			inode->i_fop = &generic_ro_fops;
 		} else if (S_ISDIR(inode->i_mode)) {
 			inode->i_op =
 #ifdef CONFIG_EROFS_FS_XATTR
-				&erofs_dir_xattr_iops;
-#else
-				&erofs_dir_iops;
+				vi->xattr_isize ? &erofs_dir_xattr_iops :
 #endif
+				&erofs_dir_iops;
 			inode->i_fop = &erofs_dir_fops;
 		} else if (S_ISLNK(inode->i_mode)) {
 			/* by default, page_get_link is used for symlink */

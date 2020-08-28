@@ -25,7 +25,6 @@
 #include <linux/spinlock.h>
 #include <net/protocol.h>
 #include <net/gre.h>
-#include <net/erspan.h>
 
 #include <net/icmp.h>
 #include <net/route.h>
@@ -87,14 +86,13 @@ int gre_parse_header(struct sk_buff *skb, struct tnl_ptk_info *tpi,
 
 	options = (__be32 *)(greh + 1);
 	if (greh->flags & GRE_CSUM) {
-		if (!skb_checksum_simple_validate(skb)) {
-			skb_checksum_try_convert(skb, IPPROTO_GRE, 0,
-						 null_compute_pseudo);
-		} else if (csum_err) {
+		if (skb_checksum_simple_validate(skb)) {
 			*csum_err = true;
 			return -EINVAL;
 		}
 
+		skb_checksum_try_convert(skb, IPPROTO_GRE, 0,
+					 null_compute_pseudo);
 		options++;
 	}
 
@@ -120,22 +118,6 @@ int gre_parse_header(struct sk_buff *skb, struct tnl_ptk_info *tpi,
 			hdr_len += 4;
 	}
 	tpi->hdr_len = hdr_len;
-
-	/* ERSPAN ver 1 and 2 protocol sets GRE key field
-	 * to 0 and sets the configured key in the
-	 * inner erspan header field
-	 */
-	if (greh->protocol == htons(ETH_P_ERSPAN) ||
-	    greh->protocol == htons(ETH_P_ERSPAN2)) {
-		struct erspan_base_hdr *ershdr;
-
-		if (!pskb_may_pull(skb, nhs + hdr_len + sizeof(*ershdr)))
-			return -EINVAL;
-
-		ershdr = (struct erspan_base_hdr *)options;
-		tpi->key = cpu_to_be32(get_session_id(ershdr));
-	}
-
 	return hdr_len;
 }
 EXPORT_SYMBOL(gre_parse_header);

@@ -167,11 +167,7 @@ lpfc_config_port_prep(struct lpfc_hba *phba)
 		       sizeof(phba->wwpn));
 	}
 
-	/*
-	 * Clear all option bits except LPFC_SLI3_BG_ENABLED,
-	 * which was already set in lpfc_get_cfgparam()
-	 */
-	phba->sli3_options &= (uint32_t)LPFC_SLI3_BG_ENABLED;
+	phba->sli3_options = 0x0;
 
 	/* Setup and issue mailbox READ REV command */
 	lpfc_read_rev(phba, pmb);
@@ -5044,7 +5040,7 @@ lpfc_sli4_async_fip_evt(struct lpfc_hba *phba,
 			break;
 		}
 		/* If fast FCF failover rescan event is pending, do nothing */
-		if (phba->fcf.fcf_flag & (FCF_REDISC_EVT | FCF_REDISC_PEND)) {
+		if (phba->fcf.fcf_flag & FCF_REDISC_EVT) {
 			spin_unlock_irq(&phba->hbalock);
 			break;
 		}

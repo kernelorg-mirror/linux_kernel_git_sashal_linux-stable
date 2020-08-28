@@ -796,9 +796,16 @@ int mt76u_alloc_queues(struct mt76_dev *dev)
 
 	err = mt76u_alloc_rx(dev);
 	if (err < 0)
-		return err;
+		goto err;
 
-	return mt76u_alloc_tx(dev);
+	err = mt76u_alloc_tx(dev);
+	if (err < 0)
+		goto err;
+
+	return 0;
+err:
+	mt76u_queues_deinit(dev);
+	return err;
 }
 EXPORT_SYMBOL_GPL(mt76u_alloc_queues);
 

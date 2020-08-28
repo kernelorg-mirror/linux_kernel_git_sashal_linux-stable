@@ -1444,10 +1444,7 @@ check:
 			new = aa_label_merge(label, target, GFP_KERNEL);
 		if (IS_ERR_OR_NULL(new)) {
 			info = "failed to build target label";
-			if (!new)
-				error = -ENOMEM;
-			else
-				error = PTR_ERR(new);
+			error = PTR_ERR(new);
 			new = NULL;
 			perms.allow = 0;
 			goto audit;

@@ -5,11 +5,6 @@
  * Copyright 2013 Cisco Systems, Inc. and/or its affiliates. All rights reserved.
  */
 
-/*
- * This file is named adv7511-v4l2.c so it doesn't conflict with the Analog
- * Device ADV7511 (config fragment CONFIG_DRM_I2C_ADV7511).
- */
-
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -135,7 +130,7 @@ static const struct v4l2_dv_timings_cap adv7511_timings_cap = {
 	.type = V4L2_DV_BT_656_1120,
 	/* keep this initialization for compatibility with GCC < 4.4.6 */
 	.reserved = { 0 },
-	V4L2_INIT_BT_TIMINGS(640, ADV7511_MAX_WIDTH, 350, ADV7511_MAX_HEIGHT,
+	V4L2_INIT_BT_TIMINGS(0, ADV7511_MAX_WIDTH, 0, ADV7511_MAX_HEIGHT,
 		ADV7511_MIN_PIXELCLOCK, ADV7511_MAX_PIXELCLOCK,
 		V4L2_DV_BT_STD_CEA861 | V4L2_DV_BT_STD_DMT |
 			V4L2_DV_BT_STD_GTF | V4L2_DV_BT_STD_CVT,
@@ -1360,10 +1355,10 @@ static int adv7511_set_fmt(struct v4l2_subdev *sd,
 	state->xfer_func = format->format.xfer_func;
 
 	switch (format->format.colorspace) {
-	case V4L2_COLORSPACE_OPRGB:
+	case V4L2_COLORSPACE_ADOBERGB:
 		c = HDMI_COLORIMETRY_EXTENDED;
-		ec = y ? HDMI_EXTENDED_COLORIMETRY_OPYCC_601 :
-			 HDMI_EXTENDED_COLORIMETRY_OPRGB;
+		ec = y ? HDMI_EXTENDED_COLORIMETRY_ADOBE_YCC_601 :
+			 HDMI_EXTENDED_COLORIMETRY_ADOBE_RGB;
 		break;
 	case V4L2_COLORSPACE_SMPTE170M:
 		c = y ? HDMI_COLORIMETRY_ITU_601 : HDMI_COLORIMETRY_NONE;

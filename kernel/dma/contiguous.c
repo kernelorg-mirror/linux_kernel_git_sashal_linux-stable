@@ -49,11 +49,7 @@ static phys_addr_t limit_cmdline;
 
 static int __init early_cma(char *p)
 {
-	if (!p) {
-		pr_err("Config string not provided\n");
-		return -EINVAL;
-	}
-
+	pr_debug("%s(%s)\n", __func__, p);
 	size_cmdline = memparse(p, &p);
 	if (*p != '@')
 		return 0;

@@ -662,10 +662,10 @@ static ssize_t wil_read_file_ioblob(struct file *file, char __user *user_buf,
 	enum { max_count = 4096 };
 	struct wil_blob_wrapper *wil_blob = file->private_data;
 	struct wil6210_priv *wil = wil_blob->wil;
-	loff_t aligned_pos, pos = *ppos;
+	loff_t pos = *ppos;
 	size_t available = wil_blob->blob.size;
 	void *buf;
-	size_t unaligned_bytes, aligned_count, ret;
+	size_t ret;
 	int rc;
 
 	if (test_bit(wil_status_suspending, wil_blob->wil->status) ||
@@ -683,12 +683,7 @@ static ssize_t wil_read_file_ioblob(struct file *file, char __user *user_buf,
 	if (count > max_count)
 		count = max_count;
 
-	/* set pos to 4 bytes aligned */
-	unaligned_bytes = pos % 4;
-	aligned_pos = pos - unaligned_bytes;
-	aligned_count = count + unaligned_bytes;
-
-	buf = kmalloc(aligned_count, GFP_KERNEL);
+	buf = kmalloc(count, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -699,9 +694,9 @@ static ssize_t wil_read_file_ioblob(struct file *file, char __user *user_buf,
 	}
 
 	wil_memcpy_fromio_32(buf, (const void __iomem *)
-			     wil_blob->blob.data + aligned_pos, aligned_count);
+			     wil_blob->blob.data + pos, count);
 
-	ret = copy_to_user(user_buf, buf + unaligned_bytes, count);
+	ret = copy_to_user(user_buf, buf, count);
 
 	wil_pm_runtime_put(wil);
 
@@ -1267,9 +1262,6 @@ static int wil_rx_buff_mgmt_debugfs_show(struct seq_file *s, void *data)
 	struct wil_rx_buff_mgmt *rbm = &wil->rx_buff_mgmt;
 	int num_active;
 	int num_free;
-
-	if (!rbm->buff_arr)
-		return -EINVAL;
 
 	seq_printf(s, "  size = %zu\n", rbm->size);
 	seq_printf(s, "  free_list_empty_cnt = %lu\n",

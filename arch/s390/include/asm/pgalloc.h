@@ -36,11 +36,11 @@ static inline void crst_table_init(unsigned long *crst, unsigned long entry)
 
 static inline unsigned long pgd_entry_type(struct mm_struct *mm)
 {
-	if (mm_pmd_folded(mm))
+	if (mm->context.asce_limit <= _REGION3_SIZE)
 		return _SEGMENT_ENTRY_EMPTY;
-	if (mm_pud_folded(mm))
+	if (mm->context.asce_limit <= _REGION2_SIZE)
 		return _REGION3_ENTRY_EMPTY;
-	if (mm_p4d_folded(mm))
+	if (mm->context.asce_limit <= _REGION1_SIZE)
 		return _REGION2_ENTRY_EMPTY;
 	return _REGION1_ENTRY_EMPTY;
 }

@@ -277,8 +277,7 @@ xfs_dquot_set_prealloc_limits(struct xfs_dquot *dqp)
 
 /*
  * Ensure that the given in-core dquot has a buffer on disk backing it, and
- * return the buffer locked and held. This is called when the bmapi finds a
- * hole.
+ * return the buffer. This is called when the bmapi finds a hole.
  */
 STATIC int
 xfs_dquot_disk_alloc(
@@ -356,14 +355,13 @@ xfs_dquot_disk_alloc(
 	 * If everything succeeds, the caller of this function is returned a
 	 * buffer that is locked and held to the transaction.  The caller
 	 * is responsible for unlocking any buffer passed back, either
-	 * manually or by committing the transaction.  On error, the buffer is
-	 * released and not passed back.
+	 * manually or by committing the transaction.
 	 */
 	xfs_trans_bhold(tp, bp);
 	error = xfs_defer_finish(tpp);
+	tp = *tpp;
 	if (error) {
-		xfs_trans_bhold_release(*tpp, bp);
-		xfs_trans_brelse(*tpp, bp);
+		xfs_buf_relse(bp);
 		return error;
 	}
 	*bpp = bp;
@@ -523,6 +521,7 @@ xfs_qm_dqread_alloc(
 	struct xfs_buf		**bpp)
 {
 	struct xfs_trans	*tp;
+	struct xfs_buf		*bp;
 	int			error;
 
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_qm_dqalloc,
@@ -530,7 +529,7 @@ xfs_qm_dqread_alloc(
 	if (error)
 		goto err;
 
-	error = xfs_dquot_disk_alloc(&tp, dqp, bpp);
+	error = xfs_dquot_disk_alloc(&tp, dqp, &bp);
 	if (error)
 		goto err_cancel;
 
@@ -540,10 +539,10 @@ xfs_qm_dqread_alloc(
 		 * Buffer was held to the transaction, so we have to unlock it
 		 * manually here because we're not passing it back.
 		 */
-		xfs_buf_relse(*bpp);
-		*bpp = NULL;
+		xfs_buf_relse(bp);
 		goto err;
 	}
+	*bpp = bp;
 	return 0;
 
 err_cancel:

@@ -1600,7 +1600,7 @@ static void aux_sdb_init(unsigned long sdb)
 
 /*
  * aux_buffer_setup() - Setup AUX buffer for diagnostic mode sampling
- * @event:	Event the buffer is setup for, event->cpu == -1 means current
+ * @cpu:	On which to allocate, -1 means current
  * @pages:	Array of pointers to buffer pages passed from perf core
  * @nr_pages:	Total pages
  * @snapshot:	Flag for snapshot mode
@@ -1612,8 +1612,8 @@ static void aux_sdb_init(unsigned long sdb)
  *
  * Return the private AUX buffer structure if success or NULL if fails.
  */
-static void *aux_buffer_setup(struct perf_event *event, void **pages,
-			      int nr_pages, bool snapshot)
+static void *aux_buffer_setup(int cpu, void **pages, int nr_pages,
+			      bool snapshot)
 {
 	struct sf_buffer *sfb;
 	struct aux_buffer *aux;
@@ -2045,17 +2045,14 @@ static int __init init_cpum_sampling_pmu(void)
 	}
 
 	sfdbg = debug_register(KMSG_COMPONENT, 2, 1, 80);
-	if (!sfdbg) {
+	if (!sfdbg)
 		pr_err("Registering for s390dbf failed\n");
-		return -ENOMEM;
-	}
 	debug_register_view(sfdbg, &debug_sprintf_view);
 
 	err = register_external_irq(EXT_IRQ_MEASURE_ALERT,
 				    cpumf_measurement_alert);
 	if (err) {
 		pr_cpumsf_err(RS_INIT_FAILURE_ALRT);
-		debug_unregister(sfdbg);
 		goto out;
 	}
 
@@ -2064,7 +2061,6 @@ static int __init init_cpum_sampling_pmu(void)
 		pr_cpumsf_err(RS_INIT_FAILURE_PERF);
 		unregister_external_irq(EXT_IRQ_MEASURE_ALERT,
 					cpumf_measurement_alert);
-		debug_unregister(sfdbg);
 		goto out;
 	}
 

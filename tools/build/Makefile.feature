@@ -79,8 +79,8 @@ FEATURE_TESTS_EXTRA :=                  \
          cplus-demangle                 \
          hello                          \
          libbabeltrace                  \
-         libbfd-liberty                 \
-         libbfd-liberty-z               \
+         liberty                        \
+         liberty-z                      \
          libunwind-debug-frame          \
          libunwind-debug-frame-arm      \
          libunwind-debug-frame-aarch64  \

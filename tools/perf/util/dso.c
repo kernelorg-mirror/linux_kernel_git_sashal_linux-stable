@@ -295,7 +295,7 @@ static int decompress_kmodule(struct dso *dso, const char *name,
 		unlink(tmpbuf);
 
 	if (pathname && (fd >= 0))
-		strlcpy(pathname, tmpbuf, len);
+		strncpy(pathname, tmpbuf, len);
 
 	return fd;
 }

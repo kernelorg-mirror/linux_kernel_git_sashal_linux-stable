@@ -240,8 +240,7 @@ static int snd_timer_check_master(struct snd_timer_instance *master)
 	return 0;
 }
 
-static int snd_timer_close_locked(struct snd_timer_instance *timeri,
-				  struct device **card_devp_to_put);
+static int snd_timer_close_locked(struct snd_timer_instance *timeri);
 
 /*
  * open a timer instance
@@ -253,23 +252,21 @@ int snd_timer_open(struct snd_timer_instance **ti,
 {
 	struct snd_timer *timer;
 	struct snd_timer_instance *timeri = NULL;
-	struct device *card_dev_to_put = NULL;
 	int err;
 
-	mutex_lock(&register_mutex);
 	if (tid->dev_class == SNDRV_TIMER_CLASS_SLAVE) {
 		/* open a slave instance */
 		if (tid->dev_sclass <= SNDRV_TIMER_SCLASS_NONE ||
 		    tid->dev_sclass > SNDRV_TIMER_SCLASS_OSS_SEQUENCER) {
 			pr_debug("ALSA: timer: invalid slave class %i\n",
 				 tid->dev_sclass);
-			err = -EINVAL;
-			goto unlock;
+			return -EINVAL;
 		}
+		mutex_lock(&register_mutex);
 		timeri = snd_timer_instance_new(owner, NULL);
 		if (!timeri) {
-			err = -ENOMEM;
-			goto unlock;
+			mutex_unlock(&register_mutex);
+			return -ENOMEM;
 		}
 		timeri->slave_class = tid->dev_sclass;
 		timeri->slave_id = tid->device;
@@ -277,13 +274,16 @@ int snd_timer_open(struct snd_timer_instance **ti,
 		list_add_tail(&timeri->open_list, &snd_timer_slave_list);
 		err = snd_timer_check_slave(timeri);
 		if (err < 0) {
-			snd_timer_close_locked(timeri, &card_dev_to_put);
+			snd_timer_close_locked(timeri);
 			timeri = NULL;
 		}
-		goto unlock;
+		mutex_unlock(&register_mutex);
+		*ti = timeri;
+		return err;
 	}
 
 	/* open a master instance */
+	mutex_lock(&register_mutex);
 	timer = snd_timer_find(tid);
 #ifdef CONFIG_MODULES
 	if (!timer) {
@@ -294,26 +294,25 @@ int snd_timer_open(struct snd_timer_instance **ti,
 	}
 #endif
 	if (!timer) {
-		err = -ENODEV;
-		goto unlock;
+		mutex_unlock(&register_mutex);
+		return -ENODEV;
 	}
 	if (!list_empty(&timer->open_list_head)) {
-		struct snd_timer_instance *t =
-			list_entry(timer->open_list_head.next,
+		timeri = list_entry(timer->open_list_head.next,
 				    struct snd_timer_instance, open_list);
-		if (t->flags & SNDRV_TIMER_IFLG_EXCLUSIVE) {
-			err = -EBUSY;
-			goto unlock;
+		if (timeri->flags & SNDRV_TIMER_IFLG_EXCLUSIVE) {
+			mutex_unlock(&register_mutex);
+			return -EBUSY;
 		}
 	}
 	if (timer->num_instances >= timer->max_instances) {
-		err = -EBUSY;
-		goto unlock;
+		mutex_unlock(&register_mutex);
+		return -EBUSY;
 	}
 	timeri = snd_timer_instance_new(owner, timer);
 	if (!timeri) {
-		err = -ENOMEM;
-		goto unlock;
+		mutex_unlock(&register_mutex);
+		return -ENOMEM;
 	}
 	/* take a card refcount for safe disconnection */
 	if (timer->card)
@@ -322,16 +321,16 @@ int snd_timer_open(struct snd_timer_instance **ti,
 	timeri->slave_id = slave_id;
 
 	if (list_empty(&timer->open_list_head) && timer->hw.open) {
-		err = timer->hw.open(timer);
+		int err = timer->hw.open(timer);
 		if (err) {
 			kfree(timeri->owner);
 			kfree(timeri);
-			timeri = NULL;
 
 			if (timer->card)
-				card_dev_to_put = &timer->card->card_dev;
+				put_device(&timer->card->card_dev);
 			module_put(timer->module);
-			goto unlock;
+			mutex_unlock(&register_mutex);
+			return err;
 		}
 	}
 
@@ -339,15 +338,10 @@ int snd_timer_open(struct snd_timer_instance **ti,
 	timer->num_instances++;
 	err = snd_timer_check_master(timeri);
 	if (err < 0) {
-		snd_timer_close_locked(timeri, &card_dev_to_put);
+		snd_timer_close_locked(timeri);
 		timeri = NULL;
 	}
-
- unlock:
 	mutex_unlock(&register_mutex);
-	/* put_device() is called after unlock for avoiding deadlock */
-	if (card_dev_to_put)
-		put_device(card_dev_to_put);
 	*ti = timeri;
 	return err;
 }
@@ -357,8 +351,7 @@ EXPORT_SYMBOL(snd_timer_open);
  * close a timer instance
  * call this with register_mutex down.
  */
-static int snd_timer_close_locked(struct snd_timer_instance *timeri,
-				  struct device **card_devp_to_put)
+static int snd_timer_close_locked(struct snd_timer_instance *timeri)
 {
 	struct snd_timer *timer = NULL;
 	struct snd_timer_instance *slave, *tmp;
@@ -410,7 +403,7 @@ static int snd_timer_close_locked(struct snd_timer_instance *timeri,
 			timer->hw.close(timer);
 		/* release a card refcount for safe disconnection */
 		if (timer->card)
-			*card_devp_to_put = &timer->card->card_dev;
+			put_device(&timer->card->card_dev);
 		module_put(timer->module);
 	}
 
@@ -422,18 +415,14 @@ static int snd_timer_close_locked(struct snd_timer_instance *timeri,
  */
 int snd_timer_close(struct snd_timer_instance *timeri)
 {
-	struct device *card_dev_to_put = NULL;
 	int err;
 
 	if (snd_BUG_ON(!timeri))
 		return -ENXIO;
 
 	mutex_lock(&register_mutex);
-	err = snd_timer_close_locked(timeri, &card_dev_to_put);
+	err = snd_timer_close_locked(timeri);
 	mutex_unlock(&register_mutex);
-	/* put_device() is called after unlock for avoiding deadlock */
-	if (card_dev_to_put)
-		put_device(card_dev_to_put);
 	return err;
 }
 EXPORT_SYMBOL(snd_timer_close);

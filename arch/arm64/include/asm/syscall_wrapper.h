@@ -30,10 +30,10 @@
 	}										\
 	static inline long __do_compat_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))
 
-#define COMPAT_SYSCALL_DEFINE0(sname)							\
-	asmlinkage long __arm64_compat_sys_##sname(const struct pt_regs *__unused);	\
-	ALLOW_ERROR_INJECTION(__arm64_compat_sys_##sname, ERRNO);			\
-	asmlinkage long __arm64_compat_sys_##sname(const struct pt_regs *__unused)
+#define COMPAT_SYSCALL_DEFINE0(sname)					\
+	asmlinkage long __arm64_compat_sys_##sname(void);		\
+	ALLOW_ERROR_INJECTION(__arm64_compat_sys_##sname, ERRNO);	\
+	asmlinkage long __arm64_compat_sys_##sname(void)
 
 #define COND_SYSCALL_COMPAT(name) \
 	cond_syscall(__arm64_compat_sys_##name);
@@ -62,11 +62,11 @@
 	static inline long __do_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))
 
 #ifndef SYSCALL_DEFINE0
-#define SYSCALL_DEFINE0(sname)							\
-	SYSCALL_METADATA(_##sname, 0);						\
-	asmlinkage long __arm64_sys_##sname(const struct pt_regs *__unused);	\
-	ALLOW_ERROR_INJECTION(__arm64_sys_##sname, ERRNO);			\
-	asmlinkage long __arm64_sys_##sname(const struct pt_regs *__unused)
+#define SYSCALL_DEFINE0(sname)					\
+	SYSCALL_METADATA(_##sname, 0);				\
+	asmlinkage long __arm64_sys_##sname(void);		\
+	ALLOW_ERROR_INJECTION(__arm64_sys_##sname, ERRNO);	\
+	asmlinkage long __arm64_sys_##sname(void)
 #endif
 
 #ifndef COND_SYSCALL

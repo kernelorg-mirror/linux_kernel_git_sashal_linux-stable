@@ -289,29 +289,16 @@ static int gtp1u_udp_encap_recv(struct gtp_dev *gtp, struct sk_buff *skb)
 	return gtp_rx(pctx, skb, hdrlen, gtp->role);
 }
 
-static void __gtp_encap_destroy(struct sock *sk)
+static void gtp_encap_destroy(struct sock *sk)
 {
 	struct gtp_dev *gtp;
 
-	lock_sock(sk);
-	gtp = sk->sk_user_data;
+	gtp = rcu_dereference_sk_user_data(sk);
 	if (gtp) {
-		if (gtp->sk0 == sk)
-			gtp->sk0 = NULL;
-		else
-			gtp->sk1u = NULL;
 		udp_sk(sk)->encap_type = 0;
 		rcu_assign_sk_user_data(sk, NULL);
 		sock_put(sk);
 	}
-	release_sock(sk);
-}
-
-static void gtp_encap_destroy(struct sock *sk)
-{
-	rtnl_lock();
-	__gtp_encap_destroy(sk);
-	rtnl_unlock();
 }
 
 static void gtp_encap_disable_sock(struct sock *sk)
@@ -319,7 +306,7 @@ static void gtp_encap_disable_sock(struct sock *sk)
 	if (!sk)
 		return;
 
-	__gtp_encap_destroy(sk);
+	gtp_encap_destroy(sk);
 }
 
 static void gtp_encap_disable(struct gtp_dev *gtp)
@@ -813,8 +800,7 @@ static struct sock *gtp_encap_enable_socket(int fd, int type,
 		goto out_sock;
 	}
 
-	lock_sock(sock->sk);
-	if (sock->sk->sk_user_data) {
+	if (rcu_dereference_sk_user_data(sock->sk)) {
 		sk = ERR_PTR(-EBUSY);
 		goto out_sock;
 	}
@@ -830,7 +816,6 @@ static struct sock *gtp_encap_enable_socket(int fd, int type,
 	setup_udp_tunnel_sock(sock_net(sock->sk), sock, &tuncfg);
 
 out_sock:
-	release_sock(sock->sk);
 	sockfd_put(sock);
 	return sk;
 }
@@ -862,13 +847,8 @@ static int gtp_encap_enable(struct gtp_dev *gtp, struct nlattr *data[])
 
 	if (data[IFLA_GTP_ROLE]) {
 		role = nla_get_u32(data[IFLA_GTP_ROLE]);
-		if (role > GTP_ROLE_SGSN) {
-			if (sk0)
-				gtp_encap_disable_sock(sk0);
-			if (sk1u)
-				gtp_encap_disable_sock(sk1u);
+		if (role > GTP_ROLE_SGSN)
 			return -EINVAL;
-		}
 	}
 
 	gtp->sk0 = sk0;
@@ -969,7 +949,7 @@ static int ipv4_pdp_add(struct gtp_dev *gtp, struct sock *sk,
 
 	}
 
-	pctx = kmalloc(sizeof(*pctx), GFP_ATOMIC);
+	pctx = kmalloc(sizeof(struct pdp_ctx), GFP_KERNEL);
 	if (pctx == NULL)
 		return -ENOMEM;
 
@@ -1058,7 +1038,6 @@ static int gtp_genl_new_pdp(struct sk_buff *skb, struct genl_info *info)
 		return -EINVAL;
 	}
 
-	rtnl_lock();
 	rcu_read_lock();
 
 	gtp = gtp_find_dev(sock_net(skb->sk), info->attrs);
@@ -1083,7 +1062,6 @@ static int gtp_genl_new_pdp(struct sk_buff *skb, struct genl_info *info)
 
 out_unlock:
 	rcu_read_unlock();
-	rtnl_unlock();
 	return err;
 }
 
@@ -1385,9 +1363,9 @@ late_initcall(gtp_init);
 
 static void __exit gtp_fini(void)
 {
+	unregister_pernet_subsys(&gtp_net_ops);
 	genl_unregister_family(&gtp_genl_family);
 	rtnl_link_unregister(&gtp_link_ops);
-	unregister_pernet_subsys(&gtp_net_ops);
 
 	pr_info("GTP module unloaded\n");
 }

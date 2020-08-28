@@ -299,9 +299,6 @@ void hclgevf_update_link_status(struct hclgevf_dev *hdev, int link_state)
 
 	client = handle->client;
 
-	link_state =
-		test_bit(HCLGEVF_STATE_DOWN, &hdev->state) ? 0 : link_state;
-
 	if (link_state != hdev->hw.mac.link) {
 		client->ops->link_status_change(handle, !!link_state);
 		hdev->hw.mac.link = link_state;
@@ -1065,8 +1062,6 @@ static int hclgevf_reset(struct hclgevf_dev *hdev)
 	/* bring down the nic to stop any ongoing TX/RX */
 	hclgevf_notify_client(hdev, HNAE3_DOWN_CLIENT);
 
-	rtnl_unlock();
-
 	/* check if VF could successfully fetch the hardware reset completion
 	 * status from the hardware
 	 */
@@ -1078,14 +1073,11 @@ static int hclgevf_reset(struct hclgevf_dev *hdev)
 			ret);
 
 		dev_warn(&hdev->pdev->dev, "VF reset failed, disabling VF!\n");
-		rtnl_lock();
 		hclgevf_notify_client(hdev, HNAE3_UNINIT_CLIENT);
 
 		rtnl_unlock();
 		return ret;
 	}
-
-	rtnl_lock();
 
 	/* now, re-initialize the nic client and ae device*/
 	ret = hclgevf_reset_stack(hdev);
@@ -1456,8 +1448,6 @@ static void hclgevf_ae_stop(struct hnae3_handle *handle)
 	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
 	int i, queue_id;
 
-	set_bit(HCLGEVF_STATE_DOWN, &hdev->state);
-
 	for (i = 0; i < hdev->num_tqps; i++) {
 		/* Ring disable */
 		queue_id = hclgevf_get_queue_id(handle->kinfo.tqp[i]);
@@ -1629,22 +1619,17 @@ static int hclgevf_init_client_instance(struct hnae3_client *client,
 
 		ret = client->ops->init_instance(&hdev->nic);
 		if (ret)
-			goto clear_nic;
-
-		hnae3_set_client_init_flag(client, ae_dev, 1);
+			return ret;
 
 		if (hdev->roce_client && hnae3_dev_roce_supported(hdev)) {
 			struct hnae3_client *rc = hdev->roce_client;
 
 			ret = hclgevf_init_roce_base_info(hdev);
 			if (ret)
-				goto clear_roce;
+				return ret;
 			ret = rc->ops->init_instance(&hdev->roce);
 			if (ret)
-				goto clear_roce;
-
-			hnae3_set_client_init_flag(hdev->roce_client, ae_dev,
-						   1);
+				return ret;
 		}
 		break;
 	case HNAE3_CLIENT_UNIC:
@@ -1653,9 +1638,7 @@ static int hclgevf_init_client_instance(struct hnae3_client *client,
 
 		ret = client->ops->init_instance(&hdev->nic);
 		if (ret)
-			goto clear_nic;
-
-		hnae3_set_client_init_flag(client, ae_dev, 1);
+			return ret;
 		break;
 	case HNAE3_CLIENT_ROCE:
 		if (hnae3_dev_roce_supported(hdev)) {
@@ -1666,26 +1649,15 @@ static int hclgevf_init_client_instance(struct hnae3_client *client,
 		if (hdev->roce_client && hdev->nic_client) {
 			ret = hclgevf_init_roce_base_info(hdev);
 			if (ret)
-				goto clear_roce;
+				return ret;
 
 			ret = client->ops->init_instance(&hdev->roce);
 			if (ret)
-				goto clear_roce;
+				return ret;
 		}
-
-		hnae3_set_client_init_flag(client, ae_dev, 1);
 	}
 
 	return 0;
-
-clear_nic:
-	hdev->nic_client = NULL;
-	hdev->nic.client = NULL;
-	return ret;
-clear_roce:
-	hdev->roce_client = NULL;
-	hdev->roce.client = NULL;
-	return ret;
 }
 
 static void hclgevf_uninit_client_instance(struct hnae3_client *client,
@@ -1694,19 +1666,13 @@ static void hclgevf_uninit_client_instance(struct hnae3_client *client,
 	struct hclgevf_dev *hdev = ae_dev->priv;
 
 	/* un-init roce, if it exists */
-	if (hdev->roce_client) {
+	if (hdev->roce_client)
 		hdev->roce_client->ops->uninit_instance(&hdev->roce, 0);
-		hdev->roce_client = NULL;
-		hdev->roce.client = NULL;
-	}
 
 	/* un-init nic/unic, if this was not called by roce client */
-	if (client->ops->uninit_instance && hdev->nic_client &&
-	    client->type != HNAE3_CLIENT_ROCE) {
+	if ((client->ops->uninit_instance) &&
+	    (client->type != HNAE3_CLIENT_ROCE))
 		client->ops->uninit_instance(&hdev->nic, 0);
-		hdev->nic_client = NULL;
-		hdev->nic.client = NULL;
-	}
 }
 
 static int hclgevf_pci_init(struct hclgevf_dev *hdev)

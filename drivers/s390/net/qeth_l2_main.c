@@ -789,10 +789,7 @@ static int __qeth_l2_open(struct net_device *dev)
 
 	if (qdio_stop_irq(card->data.ccwdev, 0) >= 0) {
 		napi_enable(&card->napi);
-		local_bh_disable();
 		napi_schedule(&card->napi);
-		/* kick-start the NAPI softirq: */
-		local_bh_enable();
 	} else
 		rc = -EIO;
 	return rc;
@@ -857,10 +854,7 @@ static void qeth_l2_remove_device(struct ccwgroup_device *cgdev)
 
 	if (cgdev->state == CCWGROUP_ONLINE)
 		qeth_l2_set_offline(cgdev);
-
-	cancel_work_sync(&card->close_dev_work);
-	if (qeth_netdev_is_registered(card->dev))
-		unregister_netdev(card->dev);
+	unregister_netdev(card->dev);
 }
 
 static const struct ethtool_ops qeth_l2_ethtool_ops = {
@@ -900,7 +894,7 @@ static int qeth_l2_setup_netdev(struct qeth_card *card)
 {
 	int rc;
 
-	if (qeth_netdev_is_registered(card->dev))
+	if (card->dev->netdev_ops)
 		return 0;
 
 	card->dev->priv_flags |= IFF_UNICAST_FLT;
@@ -1904,7 +1898,7 @@ static void qeth_bridgeport_an_set_cb(void *priv,
 
 	l2entry = (struct qdio_brinfo_entry_l2 *)entry;
 	code = IPA_ADDR_CHANGE_CODE_MACADDR;
-	if (l2entry->addr_lnid.lnid < VLAN_N_VID)
+	if (l2entry->addr_lnid.lnid)
 		code |= IPA_ADDR_CHANGE_CODE_VLANID;
 	qeth_bridge_emit_host_event(card, anev_reg_unreg, code,
 		(struct net_if_token *)&l2entry->nit,

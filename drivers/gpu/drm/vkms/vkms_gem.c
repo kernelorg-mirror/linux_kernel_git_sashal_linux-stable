@@ -1,4 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ */
 
 #include <linux/shmem_fs.h>
 
@@ -110,8 +116,11 @@ struct drm_gem_object *vkms_gem_create(struct drm_device *dev,
 
 	ret = drm_gem_handle_create(file, &obj->gem, handle);
 	drm_gem_object_put_unlocked(&obj->gem);
-	if (ret)
+	if (ret) {
+		drm_gem_object_release(&obj->gem);
+		kfree(obj);
 		return ERR_PTR(ret);
+	}
 
 	return &obj->gem;
 }

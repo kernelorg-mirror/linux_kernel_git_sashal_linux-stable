@@ -282,7 +282,7 @@ lpfc_nvme_delete_queue(struct nvme_fc_local_port *pnvme_lport,
 	vport = lport->vport;
 
 	lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME,
-			"6001 ENTER.  lpfc_pnvme %p, qidx x%x qhandle %p\n",
+			"6001 ENTER.  lpfc_pnvme %p, qidx x%xi qhandle %p\n",
 			lport, qidx, handle);
 	kfree(handle);
 }
@@ -297,8 +297,7 @@ lpfc_nvme_localport_delete(struct nvme_fc_local_port *localport)
 			 lport);
 
 	/* release any threads waiting for the unreg to complete */
-	if (lport->vport->localport)
-		complete(lport->lport_unreg_cmp);
+	complete(&lport->lport_unreg_done);
 }
 
 /* lpfc_nvme_remoteport_delete
@@ -2477,9 +2476,6 @@ lpfc_nvme_create_localport(struct lpfc_vport *vport)
 	lpfc_nvme_template.max_sgl_segments = phba->cfg_nvme_seg_cnt + 1;
 	lpfc_nvme_template.max_hw_queues = phba->cfg_nvme_io_channel;
 
-	if (!IS_ENABLED(CONFIG_NVME_FC))
-		return ret;
-
 	cstat = kmalloc((sizeof(struct lpfc_nvme_ctrl_stat) *
 			phba->cfg_nvme_io_channel), GFP_KERNEL);
 	if (!cstat)
@@ -2488,9 +2484,12 @@ lpfc_nvme_create_localport(struct lpfc_vport *vport)
 	/* localport is allocated from the stack, but the registration
 	 * call allocates heap memory as well as the private area.
 	 */
-
+#if (IS_ENABLED(CONFIG_NVME_FC))
 	ret = nvme_fc_register_localport(&nfcp_info, &lpfc_nvme_template,
 					 &vport->phba->pcidev->dev, &localport);
+#else
+	ret = -ENOMEM;
+#endif
 	if (!ret) {
 		lpfc_printf_vlog(vport, KERN_INFO, LOG_NVME | LOG_NVME_DISC,
 				 "6005 Successfully registered local "
@@ -2557,8 +2556,7 @@ lpfc_nvme_create_localport(struct lpfc_vport *vport)
  */
 void
 lpfc_nvme_lport_unreg_wait(struct lpfc_vport *vport,
-			   struct lpfc_nvme_lport *lport,
-			   struct completion *lport_unreg_cmp)
+			   struct lpfc_nvme_lport *lport)
 {
 #if (IS_ENABLED(CONFIG_NVME_FC))
 	u32 wait_tmo;
@@ -2570,7 +2568,8 @@ lpfc_nvme_lport_unreg_wait(struct lpfc_vport *vport,
 	 */
 	wait_tmo = msecs_to_jiffies(LPFC_NVME_WAIT_TMO * 1000);
 	while (true) {
-		ret = wait_for_completion_timeout(lport_unreg_cmp, wait_tmo);
+		ret = wait_for_completion_timeout(&lport->lport_unreg_done,
+						  wait_tmo);
 		if (unlikely(!ret)) {
 			lpfc_printf_vlog(vport, KERN_ERR, LOG_NVME_IOERR,
 					 "6176 Lport %p Localport %p wait "
@@ -2604,12 +2603,12 @@ lpfc_nvme_destroy_localport(struct lpfc_vport *vport)
 	struct lpfc_nvme_lport *lport;
 	struct lpfc_nvme_ctrl_stat *cstat;
 	int ret;
-	DECLARE_COMPLETION_ONSTACK(lport_unreg_cmp);
 
 	if (vport->nvmei_support == 0)
 		return;
 
 	localport = vport->localport;
+	vport->localport = NULL;
 	lport = (struct lpfc_nvme_lport *)localport->private;
 	cstat = lport->cstat;
 
@@ -2620,14 +2619,13 @@ lpfc_nvme_destroy_localport(struct lpfc_vport *vport)
 	/* lport's rport list is clear.  Unregister
 	 * lport and release resources.
 	 */
-	lport->lport_unreg_cmp = &lport_unreg_cmp;
+	init_completion(&lport->lport_unreg_done);
 	ret = nvme_fc_unregister_localport(localport);
 
 	/* Wait for completion.  This either blocks
 	 * indefinitely or succeeds
 	 */
-	lpfc_nvme_lport_unreg_wait(vport, lport, &lport_unreg_cmp);
-	vport->localport = NULL;
+	lpfc_nvme_lport_unreg_wait(vport, lport);
 	kfree(cstat);
 
 	/* Regardless of the unregister upcall response, clear

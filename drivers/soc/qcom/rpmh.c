@@ -80,7 +80,6 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
 	struct rpmh_request *rpm_msg = container_of(msg, struct rpmh_request,
 						    msg);
 	struct completion *compl = rpm_msg->completion;
-	bool free = rpm_msg->needs_free;
 
 	rpm_msg->err = r;
 
@@ -95,7 +94,7 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
 	complete(compl);
 
 exit:
-	if (free)
+	if (rpm_msg->needs_free)
 		kfree(rpm_msg);
 }
 
@@ -349,12 +348,11 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
 {
 	struct batch_cache_req *req;
 	struct rpmh_request *rpm_msgs;
-	struct completion *compls;
+	DECLARE_COMPLETION_ONSTACK(compl);
 	struct rpmh_ctrlr *ctrlr = get_rpmh_ctrlr(dev);
 	unsigned long time_left;
 	int count = 0;
-	int ret, i;
-	void *ptr;
+	int ret, i, j;
 
 	if (!cmd || !n)
 		return -EINVAL;
@@ -364,15 +362,10 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
 	if (!count)
 		return -EINVAL;
 
-	ptr = kzalloc(sizeof(*req) +
-		      count * (sizeof(req->rpm_msgs[0]) + sizeof(*compls)),
+	req = kzalloc(sizeof(*req) + count * sizeof(req->rpm_msgs[0]),
 		      GFP_ATOMIC);
-	if (!ptr)
+	if (!req)
 		return -ENOMEM;
-
-	req = ptr;
-	compls = ptr + sizeof(*req) + count * sizeof(*rpm_msgs);
-
 	req->count = count;
 	rpm_msgs = req->rpm_msgs;
 
@@ -387,26 +380,25 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
 	}
 
 	for (i = 0; i < count; i++) {
-		struct completion *compl = &compls[i];
-
-		init_completion(compl);
-		rpm_msgs[i].completion = compl;
+		rpm_msgs[i].completion = &compl;
 		ret = rpmh_rsc_send_data(ctrlr_to_drv(ctrlr), &rpm_msgs[i].msg);
 		if (ret) {
 			pr_err("Error(%d) sending RPMH message addr=%#x\n",
 			       ret, rpm_msgs[i].msg.cmds[0].addr);
+			for (j = i; j < count; j++)
+				rpmh_tx_done(&rpm_msgs[j].msg, ret);
 			break;
 		}
 	}
 
 	time_left = RPMH_TIMEOUT_MS;
-	while (i--) {
-		time_left = wait_for_completion_timeout(&compls[i], time_left);
+	for (i = 0; i < count; i++) {
+		time_left = wait_for_completion_timeout(&compl, time_left);
 		if (!time_left) {
 			/*
 			 * Better hope they never finish because they'll signal
-			 * the completion that we're going to free once
-			 * we've returned from this function.
+			 * the completion on our stack and that's bad once
+			 * we've returned from the function.
 			 */
 			WARN_ON(1);
 			ret = -ETIMEDOUT;
@@ -415,7 +407,7 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
 	}
 
 exit:
-	kfree(ptr);
+	kfree(req);
 
 	return ret;
 }

@@ -4,7 +4,6 @@
 #include "ixgbe.h"
 #include <net/xfrm.h>
 #include <crypto/aead.h>
-#include <linux/if_bridge.h>
 
 /**
  * ixgbe_ipsec_set_tx_sa - set the Tx SA registers
@@ -676,10 +675,6 @@ static int ixgbe_ipsec_add_sa(struct xfrm_state *xs)
 			     (__force u32)rsa.xs->id.spi);
 	} else {
 		struct tx_sa tsa;
-
-		if (adapter->num_vfs &&
-		    adapter->bridge_mode != BRIDGE_MODE_VEPA)
-			return -EOPNOTSUPP;
 
 		/* find the first unused index */
 		ret = ixgbe_ipsec_find_empty_idx(ipsec, false);

@@ -1052,9 +1052,10 @@ do {										\
 	__ret;									\
 })
 
-#define __wait_event_lock_irq_timeout(wq_head, condition, lock, timeout, state)	\
+#define __wait_event_interruptible_lock_irq_timeout(wq_head, condition,		\
+						    lock, timeout)		\
 	___wait_event(wq_head, ___wait_cond_timeout(condition),			\
-		      state, 0, timeout,					\
+		      TASK_INTERRUPTIBLE, 0, timeout,				\
 		      spin_unlock_irq(&lock);					\
 		      __ret = schedule_timeout(__ret);				\
 		      spin_lock_irq(&lock));
@@ -1088,19 +1089,8 @@ do {										\
 ({										\
 	long __ret = timeout;							\
 	if (!___wait_cond_timeout(condition))					\
-		__ret = __wait_event_lock_irq_timeout(				\
-					wq_head, condition, lock, timeout,	\
-					TASK_INTERRUPTIBLE);			\
-	__ret;									\
-})
-
-#define wait_event_lock_irq_timeout(wq_head, condition, lock, timeout)		\
-({										\
-	long __ret = timeout;							\
-	if (!___wait_cond_timeout(condition))					\
-		__ret = __wait_event_lock_irq_timeout(				\
-					wq_head, condition, lock, timeout,	\
-					TASK_UNINTERRUPTIBLE);			\
+		__ret = __wait_event_interruptible_lock_irq_timeout(		\
+					wq_head, condition, lock, timeout);	\
 	__ret;									\
 })
 

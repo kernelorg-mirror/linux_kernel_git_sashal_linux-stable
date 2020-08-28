@@ -215,18 +215,17 @@ static void sec_free_hw_sgl(struct sec_hw_sgl *hw_sgl,
 			    dma_addr_t psec_sgl, struct sec_dev_info *info)
 {
 	struct sec_hw_sgl *sgl_current, *sgl_next;
-	dma_addr_t sgl_next_dma;
 
+	if (!hw_sgl)
+		return;
 	sgl_current = hw_sgl;
-	while (sgl_current) {
+	while (sgl_current->next) {
 		sgl_next = sgl_current->next;
-		sgl_next_dma = sgl_current->next_sgl;
-
-		dma_pool_free(info->hw_sgl_pool, sgl_current, psec_sgl);
-
+		dma_pool_free(info->hw_sgl_pool, sgl_current,
+			      sgl_current->next_sgl);
 		sgl_current = sgl_next;
-		psec_sgl = sgl_next_dma;
 	}
+	dma_pool_free(info->hw_sgl_pool, hw_sgl, psec_sgl);
 }
 
 static int sec_alg_skcipher_setkey(struct crypto_skcipher *tfm,
@@ -733,7 +732,6 @@ static int sec_alg_skcipher_crypto(struct skcipher_request *skreq,
 	int *splits_in_nents;
 	int *splits_out_nents = NULL;
 	struct sec_request_el *el, *temp;
-	bool split = skreq->src != skreq->dst;
 
 	mutex_init(&sec_req->lock);
 	sec_req->req_base = &skreq->base;
@@ -752,7 +750,7 @@ static int sec_alg_skcipher_crypto(struct skcipher_request *skreq,
 	if (ret)
 		goto err_free_split_sizes;
 
-	if (split) {
+	if (skreq->src != skreq->dst) {
 		sec_req->len_out = sg_nents(skreq->dst);
 		ret = sec_map_and_split_sg(skreq->dst, split_sizes, steps,
 					   &splits_out, &splits_out_nents,
@@ -787,9 +785,8 @@ static int sec_alg_skcipher_crypto(struct skcipher_request *skreq,
 					       split_sizes[i],
 					       skreq->src != skreq->dst,
 					       splits_in[i], splits_in_nents[i],
-					       split ? splits_out[i] : NULL,
-					       split ? splits_out_nents[i] : 0,
-					       info);
+					       splits_out[i],
+					       splits_out_nents[i], info);
 		if (IS_ERR(el)) {
 			ret = PTR_ERR(el);
 			goto err_free_elements;
@@ -809,6 +806,13 @@ static int sec_alg_skcipher_crypto(struct skcipher_request *skreq,
 	 * more refined but this is unlikely to happen so no need.
 	 */
 
+	/* Cleanup - all elements in pointer arrays have been coppied */
+	kfree(splits_in_nents);
+	kfree(splits_in);
+	kfree(splits_out_nents);
+	kfree(splits_out);
+	kfree(split_sizes);
+
 	/* Grab a big lock for a long time to avoid concurrency issues */
 	mutex_lock(&queue->queuelock);
 
@@ -823,13 +827,13 @@ static int sec_alg_skcipher_crypto(struct skcipher_request *skreq,
 	     (!queue->havesoftqueue ||
 	      kfifo_avail(&queue->softqueue) > steps)) ||
 	    !list_empty(&ctx->backlog)) {
-		ret = -EBUSY;
 		if ((skreq->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)) {
 			list_add_tail(&sec_req->backlog_head, &ctx->backlog);
 			mutex_unlock(&queue->queuelock);
-			goto out;
+			return -EBUSY;
 		}
 
+		ret = -EBUSY;
 		mutex_unlock(&queue->queuelock);
 		goto err_free_elements;
 	}
@@ -838,15 +842,7 @@ static int sec_alg_skcipher_crypto(struct skcipher_request *skreq,
 	if (ret)
 		goto err_free_elements;
 
-	ret = -EINPROGRESS;
-out:
-	/* Cleanup - all elements in pointer arrays have been copied */
-	kfree(splits_in_nents);
-	kfree(splits_in);
-	kfree(splits_out_nents);
-	kfree(splits_out);
-	kfree(split_sizes);
-	return ret;
+	return -EINPROGRESS;
 
 err_free_elements:
 	list_for_each_entry_safe(el, temp, &sec_req->elements, head) {
@@ -858,7 +854,7 @@ err_free_elements:
 				 crypto_skcipher_ivsize(atfm),
 				 DMA_BIDIRECTIONAL);
 err_unmap_out_sg:
-	if (split)
+	if (skreq->src != skreq->dst)
 		sec_unmap_sg_on_err(skreq->dst, steps, splits_out,
 				    splits_out_nents, sec_req->len_out,
 				    info->dev);

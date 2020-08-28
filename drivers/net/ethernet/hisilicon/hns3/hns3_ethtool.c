@@ -100,19 +100,33 @@ static int hns3_lp_up(struct net_device *ndev, enum hnae3_loop loop_mode)
 	struct hnae3_handle *h = hns3_get_handle(ndev);
 	int ret;
 
+	if (!h->ae_algo->ops->start)
+		return -EOPNOTSUPP;
+
 	ret = hns3_nic_reset_all_ring(h);
 	if (ret)
 		return ret;
 
+	ret = h->ae_algo->ops->start(h);
+	if (ret) {
+		netdev_err(ndev,
+			   "hns3_lb_up ae start return error: %d\n", ret);
+		return ret;
+	}
+
 	ret = hns3_lp_setup(ndev, loop_mode, true);
 	usleep_range(10000, 20000);
 
-	return 0;
+	return ret;
 }
 
 static int hns3_lp_down(struct net_device *ndev, enum hnae3_loop loop_mode)
 {
+	struct hnae3_handle *h = hns3_get_handle(ndev);
 	int ret;
+
+	if (!h->ae_algo->ops->stop)
+		return -EOPNOTSUPP;
 
 	ret = hns3_lp_setup(ndev, loop_mode, false);
 	if (ret) {
@@ -120,6 +134,7 @@ static int hns3_lp_down(struct net_device *ndev, enum hnae3_loop loop_mode)
 		return ret;
 	}
 
+	h->ae_algo->ops->stop(h);
 	usleep_range(10000, 20000);
 
 	return 0;
@@ -137,7 +152,6 @@ static void hns3_lp_setup_skb(struct sk_buff *skb)
 	packet = skb_put(skb, HNS3_NIC_LB_TEST_PACKET_SIZE);
 
 	memcpy(ethh->h_dest, ndev->dev_addr, ETH_ALEN);
-	ethh->h_dest[5] += 0x1f;
 	eth_zero_addr(ethh->h_source);
 	ethh->h_proto = htons(ETH_P_ARP);
 	skb_reset_mac_header(skb);
@@ -231,13 +245,11 @@ static int hns3_lp_run_test(struct net_device *ndev, enum hnae3_loop mode)
 
 		skb_get(skb);
 		tx_ret = hns3_nic_net_xmit(skb, ndev);
-		if (tx_ret == NETDEV_TX_OK) {
+		if (tx_ret == NETDEV_TX_OK)
 			good_cnt++;
-		} else {
-			kfree_skb(skb);
+		else
 			netdev_err(ndev, "hns3_lb_run_test xmit failed: %d\n",
 				   tx_ret);
-		}
 	}
 	if (good_cnt != HNS3_NIC_LB_TEST_PKT_NUM) {
 		ret_val = HNS3_NIC_LB_TEST_TX_CNT_ERR;
@@ -297,7 +309,7 @@ static void hns3_self_test(struct net_device *ndev,
 			h->flags & HNAE3_SUPPORT_SERDES_LOOPBACK;
 
 	if (if_running)
-		ndev->netdev_ops->ndo_stop(ndev);
+		dev_close(ndev);
 
 #if IS_ENABLED(CONFIG_VLAN_8021Q)
 	/* Disable the vlan filter for selftest does not support it */
@@ -335,7 +347,7 @@ static void hns3_self_test(struct net_device *ndev,
 #endif
 
 	if (if_running)
-		ndev->netdev_ops->ndo_open(ndev);
+		dev_open(ndev);
 }
 
 static int hns3_get_sset_count(struct net_device *netdev, int stringset)

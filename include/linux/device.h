@@ -774,30 +774,6 @@ void device_connection_add(struct device_connection *con);
 void device_connection_remove(struct device_connection *con);
 
 /**
- * device_connections_add - Add multiple device connections at once
- * @cons: Zero terminated array of device connection descriptors
- */
-static inline void device_connections_add(struct device_connection *cons)
-{
-	struct device_connection *c;
-
-	for (c = cons; c->endpoint[0]; c++)
-		device_connection_add(c);
-}
-
-/**
- * device_connections_remove - Remove multiple device connections at once
- * @cons: Zero terminated array of device connection descriptors
- */
-static inline void device_connections_remove(struct device_connection *cons)
-{
-	struct device_connection *c;
-
-	for (c = cons; c->endpoint[0]; c++)
-		device_connection_remove(c);
-}
-
-/**
  * enum device_link_state - Device link states.
  * @DL_STATE_NONE: The presence of the drivers is not being tracked.
  * @DL_STATE_DORMANT: None of the supplier/consumer drivers is present.
@@ -1332,7 +1308,6 @@ extern int (*platform_notify_remove)(struct device *dev);
  */
 extern struct device *get_device(struct device *dev);
 extern void put_device(struct device *dev);
-extern bool kill_device(struct device *dev);
 
 #ifdef CONFIG_DEVTMPFS
 extern int devtmpfs_create_node(struct device *dev);

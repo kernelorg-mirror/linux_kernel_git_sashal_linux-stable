@@ -1426,15 +1426,10 @@ void pnfs_roc_release(struct nfs4_layoutreturn_args *args,
 	const nfs4_stateid *res_stateid = NULL;
 	struct nfs4_xdr_opaque_data *ld_private = args->ld_private;
 
-	switch (ret) {
-	case -NFS4ERR_NOMATCHING_LAYOUT:
-		break;
-	case 0:
+	if (ret == 0) {
+		arg_stateid = &args->stateid;
 		if (res->lrs_present)
 			res_stateid = &res->stateid;
-		/* Fallthrough */
-	default:
-		arg_stateid = &args->stateid;
 	}
 	pnfs_layoutreturn_free_lsegs(lo, arg_stateid, &args->range,
 			res_stateid);
@@ -1871,8 +1866,8 @@ lookup_again:
 	    atomic_read(&lo->plh_outstanding) != 0) {
 		spin_unlock(&ino->i_lock);
 		lseg = ERR_PTR(wait_var_event_killable(&lo->plh_outstanding,
-					!atomic_read(&lo->plh_outstanding)));
-		if (IS_ERR(lseg))
+					atomic_read(&lo->plh_outstanding)));
+		if (IS_ERR(lseg) || !list_empty(&lo->plh_segs))
 			goto out_put_layout_hdr;
 		pnfs_put_layout_hdr(lo);
 		goto lookup_again;

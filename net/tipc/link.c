@@ -161,7 +161,6 @@ struct tipc_link {
 	struct {
 		u16 len;
 		u16 limit;
-		struct sk_buff *target_bskb;
 	} backlog[5];
 	u16 snd_nxt;
 	u16 last_retransm;
@@ -847,7 +846,6 @@ static void link_prepare_wakeup(struct tipc_link *l)
 void tipc_link_reset(struct tipc_link *l)
 {
 	struct sk_buff_head list;
-	u32 imp;
 
 	__skb_queue_head_init(&list);
 
@@ -866,10 +864,11 @@ void tipc_link_reset(struct tipc_link *l)
 	__skb_queue_purge(&l->transmq);
 	__skb_queue_purge(&l->deferdq);
 	__skb_queue_purge(&l->backlogq);
-	for (imp = 0; imp <= TIPC_SYSTEM_IMPORTANCE; imp++) {
-		l->backlog[imp].len = 0;
-		l->backlog[imp].target_bskb = NULL;
-	}
+	l->backlog[TIPC_LOW_IMPORTANCE].len = 0;
+	l->backlog[TIPC_MEDIUM_IMPORTANCE].len = 0;
+	l->backlog[TIPC_HIGH_IMPORTANCE].len = 0;
+	l->backlog[TIPC_CRITICAL_IMPORTANCE].len = 0;
+	l->backlog[TIPC_SYSTEM_IMPORTANCE].len = 0;
 	kfree_skb(l->reasm_buf);
 	kfree_skb(l->failover_reasm_skb);
 	l->reasm_buf = NULL;
@@ -910,7 +909,7 @@ int tipc_link_xmit(struct tipc_link *l, struct sk_buff_head *list,
 	u16 bc_ack = l->bc_rcvlink->rcv_nxt - 1;
 	struct sk_buff_head *transmq = &l->transmq;
 	struct sk_buff_head *backlogq = &l->backlogq;
-	struct sk_buff *skb, *_skb, **tskb;
+	struct sk_buff *skb, *_skb, *bskb;
 	int pkt_cnt = skb_queue_len(list);
 	int rc = 0;
 
@@ -956,21 +955,19 @@ int tipc_link_xmit(struct tipc_link *l, struct sk_buff_head *list,
 			seqno++;
 			continue;
 		}
-		tskb = &l->backlog[imp].target_bskb;
-		if (tipc_msg_bundle(*tskb, hdr, mtu)) {
+		if (tipc_msg_bundle(skb_peek_tail(backlogq), hdr, mtu)) {
 			kfree_skb(__skb_dequeue(list));
 			l->stats.sent_bundled++;
 			continue;
 		}
-		if (tipc_msg_make_bundle(tskb, hdr, mtu, l->addr)) {
+		if (tipc_msg_make_bundle(&bskb, hdr, mtu, l->addr)) {
 			kfree_skb(__skb_dequeue(list));
-			__skb_queue_tail(backlogq, *tskb);
-			l->backlog[imp].len++;
+			__skb_queue_tail(backlogq, bskb);
+			l->backlog[msg_importance(buf_msg(bskb))].len++;
 			l->stats.sent_bundled++;
 			l->stats.sent_bundles++;
 			continue;
 		}
-		l->backlog[imp].target_bskb = NULL;
 		l->backlog[imp].len += skb_queue_len(list);
 		skb_queue_splice_tail_init(list, backlogq);
 	}
@@ -986,7 +983,6 @@ static void tipc_link_advance_backlog(struct tipc_link *l,
 	u16 seqno = l->snd_nxt;
 	u16 ack = l->rcv_nxt - 1;
 	u16 bc_ack = l->bc_rcvlink->rcv_nxt - 1;
-	u32 imp;
 
 	while (skb_queue_len(&l->transmq) < l->window) {
 		skb = skb_peek(&l->backlogq);
@@ -997,10 +993,7 @@ static void tipc_link_advance_backlog(struct tipc_link *l,
 			break;
 		__skb_dequeue(&l->backlogq);
 		hdr = buf_msg(skb);
-		imp = msg_importance(hdr);
-		l->backlog[imp].len--;
-		if (unlikely(skb == l->backlog[imp].target_bskb))
-			l->backlog[imp].target_bskb = NULL;
+		l->backlog[msg_importance(hdr)].len--;
 		__skb_queue_tail(&l->transmq, skb);
 		__skb_queue_tail(xmitq, _skb);
 		TIPC_SKB_CB(skb)->ackers = l->ackers;
@@ -1601,17 +1594,14 @@ static int tipc_link_proto_rcv(struct tipc_link *l, struct sk_buff *skb,
 		if (in_range(peers_prio, l->priority + 1, TIPC_MAX_LINK_PRI))
 			l->priority = peers_prio;
 
-		/* If peer is going down we want full re-establish cycle */
-		if (msg_peer_stopping(hdr)) {
-			rc = tipc_link_fsm_evt(l, LINK_FAILURE_EVT);
-			break;
-		}
 		/* ACTIVATE_MSG serves as PEER_RESET if link is already down */
-		if (mtyp == RESET_MSG || !link_is_up(l))
+		if (msg_peer_stopping(hdr))
+			rc = tipc_link_fsm_evt(l, LINK_FAILURE_EVT);
+		else if ((mtyp == RESET_MSG) || !link_is_up(l))
 			rc = tipc_link_fsm_evt(l, LINK_PEER_RESET_EVT);
 
 		/* ACTIVATE_MSG takes up link if it was already locally reset */
-		if (mtyp == ACTIVATE_MSG && l->state == LINK_ESTABLISHING)
+		if ((mtyp == ACTIVATE_MSG) && (l->state == LINK_ESTABLISHING))
 			rc = TIPC_LINK_UP_EVT;
 
 		l->peer_session = msg_session(hdr);

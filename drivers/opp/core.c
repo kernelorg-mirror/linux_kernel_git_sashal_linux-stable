@@ -191,11 +191,11 @@ unsigned long dev_pm_opp_get_max_volt_latency(struct device *dev)
 	if (IS_ERR(opp_table))
 		return 0;
 
-	/* Regulator may not be required for the device */
-	if (!opp_table->regulators)
-		goto put_opp_table;
-
 	count = opp_table->regulator_count;
+
+	/* Regulator may not be required for the device */
+	if (!count)
+		goto put_opp_table;
 
 	uV = kmalloc_array(count, sizeof(*uV), GFP_KERNEL);
 	if (!uV)
@@ -313,7 +313,7 @@ int dev_pm_opp_get_opp_count(struct device *dev)
 		count = PTR_ERR(opp_table);
 		dev_dbg(dev, "%s: OPP table not found (%d)\n",
 			__func__, count);
-		return count;
+		return 0;
 	}
 
 	count = _get_opp_count(opp_table);
@@ -976,9 +976,6 @@ static bool _opp_supported_by_regulators(struct dev_pm_opp *opp,
 	struct regulator *reg;
 	int i;
 
-	if (!opp_table->regulators)
-		return true;
-
 	for (i = 0; i < opp_table->regulator_count; i++) {
 		reg = opp_table->regulators[i];
 
@@ -1266,7 +1263,7 @@ static int _allocate_set_opp_data(struct opp_table *opp_table)
 	struct dev_pm_set_opp_data *data;
 	int len, count = opp_table->regulator_count;
 
-	if (WARN_ON(!opp_table->regulators))
+	if (WARN_ON(!count))
 		return -EINVAL;
 
 	/* space for set_opp_data */

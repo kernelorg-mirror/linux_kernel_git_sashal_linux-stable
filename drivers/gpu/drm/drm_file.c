@@ -479,9 +479,11 @@ int drm_release(struct inode *inode, struct file *filp)
 
 	drm_file_free(file_priv);
 
-	if (!--dev->open_count)
+	if (!--dev->open_count) {
 		drm_lastclose(dev);
-
+		if (drm_dev_is_unplugged(dev))
+			drm_put_dev(dev);
+	}
 	mutex_unlock(&drm_global_mutex);
 
 	drm_minor_release(minor);
@@ -567,7 +569,6 @@ put_back_event:
 				file_priv->event_space -= length;
 				list_add(&e->link, &file_priv->event_list);
 				spin_unlock_irq(&dev->event_lock);
-				wake_up_interruptible(&file_priv->event_wait);
 				break;
 			}
 

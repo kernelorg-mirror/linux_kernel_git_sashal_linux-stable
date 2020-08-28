@@ -131,13 +131,9 @@ static int rvin_group_link_notify(struct media_link *link, u32 flags,
 	    !is_media_entity_v4l2_video_device(link->sink->entity))
 		return 0;
 
-	/*
-	 * Don't allow link changes if any entity in the graph is
-	 * streaming, modifying the CHSEL register fields can disrupt
-	 * running streams.
-	 */
+	/* If any entity is in use don't allow link changes. */
 	media_device_for_each_entity(entity, &group->mdev)
-		if (entity->stream_count)
+		if (entity->use_count)
 			return -EBUSY;
 
 	mutex_lock(&group->lock);
@@ -174,6 +170,7 @@ static int rvin_group_link_notify(struct media_link *link, u32 flags,
 
 	if (csi_id == -ENODEV) {
 		struct v4l2_subdev *sd;
+		unsigned int i;
 
 		/*
 		 * Make sure the source entity subdevice is registered as

@@ -89,12 +89,6 @@ out:
 	return CHAP_DIGEST_UNKNOWN;
 }
 
-static void chap_close(struct iscsi_conn *conn)
-{
-	kfree(conn->auth_protocol);
-	conn->auth_protocol = NULL;
-}
-
 static struct iscsi_chap *chap_server_open(
 	struct iscsi_conn *conn,
 	struct iscsi_node_auth *auth,
@@ -132,7 +126,7 @@ static struct iscsi_chap *chap_server_open(
 	case CHAP_DIGEST_UNKNOWN:
 	default:
 		pr_err("Unsupported CHAP_A value\n");
-		chap_close(conn);
+		kfree(conn->auth_protocol);
 		return NULL;
 	}
 
@@ -147,11 +141,17 @@ static struct iscsi_chap *chap_server_open(
 	 * Generate Challenge.
 	 */
 	if (chap_gen_challenge(conn, 1, aic_str, aic_len) < 0) {
-		chap_close(conn);
+		kfree(conn->auth_protocol);
 		return NULL;
 	}
 
 	return chap;
+}
+
+static void chap_close(struct iscsi_conn *conn)
+{
+	kfree(conn->auth_protocol);
+	conn->auth_protocol = NULL;
 }
 
 static int chap_server_compute_md5(
