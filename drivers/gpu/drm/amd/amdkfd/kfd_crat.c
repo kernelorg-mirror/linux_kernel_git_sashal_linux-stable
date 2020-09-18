@@ -772,7 +772,8 @@ int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 		return -ENODATA;
 	}
 
-	pcrat_image = kmemdup(crat_table, crat_table->length, GFP_KERNEL);
+	pcrat_image = kvmalloc(crat_table->length, GFP_KERNEL);
+	memcpy(pcrat_image, crat_table, crat_table->length);
 	if (!pcrat_image)
 		return -ENOMEM;
 
@@ -1358,7 +1359,7 @@ int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
 			num_nodes * (sizeof(struct crat_subtype_computeunit) +
 			sizeof(struct crat_subtype_memory) +
 			(num_nodes - 1) * sizeof(struct crat_subtype_iolink));
-		pcrat_image = kmalloc(dyn_size, GFP_KERNEL);
+		pcrat_image = kvmalloc(dyn_size, GFP_KERNEL);
 		if (!pcrat_image)
 			return -ENOMEM;
 		*size = dyn_size;
@@ -1368,7 +1369,7 @@ int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
 	case COMPUTE_UNIT_GPU:
 		if (!kdev)
 			return -EINVAL;
-		pcrat_image = kmalloc(VCRAT_SIZE_FOR_GPU, GFP_KERNEL);
+		pcrat_image = kvmalloc(VCRAT_SIZE_FOR_GPU, GFP_KERNEL);
 		if (!pcrat_image)
 			return -ENOMEM;
 		*size = VCRAT_SIZE_FOR_GPU;
@@ -1387,7 +1388,7 @@ int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
 	if (!ret)
 		*crat_image = pcrat_image;
 	else
-		kfree(pcrat_image);
+		kvfree(pcrat_image);
 
 	return ret;
 }
