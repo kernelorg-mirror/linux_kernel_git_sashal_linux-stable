@@ -5626,6 +5626,7 @@ static void io_req_drop_files(struct io_kiocb *req)
 	spin_unlock_irqrestore(&ctx->inflight_lock, flags);
 	req->flags &= ~REQ_F_INFLIGHT;
 	put_files_struct(req->work.files);
+	put_nsproxy(req->work.nsproxy);
 	req->work.files = NULL;
 }
 
@@ -6034,6 +6035,8 @@ static int io_grab_files(struct io_kiocb *req)
 		return 0;
 
 	req->work.files = get_files_struct(current);
+	get_nsproxy(current->nsproxy);
+	req->work.nsproxy = current->nsproxy;
 	req->flags |= REQ_F_INFLIGHT;
 
 	spin_lock_irq(&ctx->inflight_lock);
