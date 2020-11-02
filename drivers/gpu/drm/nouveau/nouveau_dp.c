@@ -36,41 +36,94 @@ MODULE_PARM_DESC(mst, "Enable DisplayPort multi-stream (default: enabled)");
 static int nouveau_mst = 1;
 module_param_named(mst, nouveau_mst, int, 0400);
 
-static void
-nouveau_dp_probe_oui(struct drm_device *dev, struct nvkm_i2c_aux *aux, u8 *dpcd)
+static enum drm_connector_status
+nouveau_dp_probe_dpcd(struct nouveau_connector *nv_connector,
+		      struct nouveau_encoder *outp)
 {
-	struct nouveau_drm *drm = nouveau_drm(dev);
-	u8 buf[3];
+	struct drm_dp_aux *aux = &nv_connector->aux;
+	struct nv50_mstm *mstm = NULL;
+	int ret;
+	u8 *dpcd = outp->dp.dpcd;
+	u8 tmp;
 
-	if (!(dpcd[DP_DOWN_STREAM_PORT_COUNT] & DP_OUI_SUPPORT))
-		return;
+	ret = drm_dp_dpcd_read(aux, DP_DPCD_REV, dpcd, DP_RECEIVER_CAP_SIZE);
+	if (ret == DP_RECEIVER_CAP_SIZE && dpcd[DP_DPCD_REV]) {
+		ret = drm_dp_read_desc(aux, &outp->dp.desc,
+				       drm_dp_is_branch(dpcd));
+		if (ret < 0)
+			return connector_status_disconnected;
+	} else {
+		return connector_status_disconnected;
+	}
 
-	if (!nvkm_rdaux(aux, DP_SINK_OUI, buf, 3))
-		NV_DEBUG(drm, "Sink OUI: %02hx%02hx%02hx\n",
-			     buf[0], buf[1], buf[2]);
+	if (nouveau_mst)
+		mstm = outp->dp.mstm;
 
-	if (!nvkm_rdaux(aux, DP_BRANCH_OUI, buf, 3))
-		NV_DEBUG(drm, "Branch OUI: %02hx%02hx%02hx\n",
-			     buf[0], buf[1], buf[2]);
+	if (mstm) {
+		if (dpcd[DP_DPCD_REV] >= DP_DPCD_REV_12) {
+			ret = drm_dp_dpcd_readb(aux, DP_MSTM_CAP, &tmp);
+			if (ret < 0)
+				return connector_status_disconnected;
 
+			mstm->can_mst = !!(tmp & DP_MST_CAP);
+		} else {
+			mstm->can_mst = false;
+		}
+	}
+
+	ret = drm_dp_read_downstream_info(aux, dpcd,
+					  outp->dp.downstream_ports);
+	if (ret < 0)
+		return connector_status_disconnected;
+
+	return connector_status_connected;
 }
 
 int
-nouveau_dp_detect(struct nouveau_encoder *nv_encoder)
+nouveau_dp_detect(struct nouveau_connector *nv_connector,
+		  struct nouveau_encoder *nv_encoder)
 {
 	struct drm_device *dev = nv_encoder->base.base.dev;
 	struct nouveau_drm *drm = nouveau_drm(dev);
-	struct nvkm_i2c_aux *aux;
-	u8 dpcd[8];
-	int ret;
+	struct drm_connector *connector = &nv_connector->base;
+	struct nv50_mstm *mstm = nv_encoder->dp.mstm;
+	enum drm_connector_status status;
+	u8 *dpcd = nv_encoder->dp.dpcd;
+	int ret = NOUVEAU_DP_NONE;
 
-	aux = nv_encoder->aux;
-	if (!aux)
-		return -ENODEV;
+	/* If we've already read the DPCD on an eDP device, we don't need to
+	 * reread it as it won't change
+	 */
+	if (connector->connector_type == DRM_MODE_CONNECTOR_eDP &&
+	    dpcd[DP_DPCD_REV] != 0)
+		return NOUVEAU_DP_SST;
 
-	ret = nvkm_rdaux(aux, DP_DPCD_REV, dpcd, sizeof(dpcd));
-	if (ret)
-		return ret;
+	mutex_lock(&nv_encoder->dp.hpd_irq_lock);
+	if (mstm) {
+		/* If we're not ready to handle MST state changes yet, just
+		 * report the last status of the connector. We'll reprobe it
+		 * once we've resumed.
+		 */
+		if (mstm->suspended) {
+			if (mstm->is_mst)
+				ret = NOUVEAU_DP_MST;
+			else if (connector->status ==
+				 connector_status_connected)
+				ret = NOUVEAU_DP_SST;
+
+			goto out;
+		}
+	}
+
+	status = nouveau_dp_probe_dpcd(nv_connector, nv_encoder);
+	if (status == connector_status_disconnected)
+		goto out;
+
+	/* If we're in MST mode, we're done here */
+	if (mstm && mstm->can_mst && mstm->is_mst) {
+		ret = NOUVEAU_DP_MST;
+		goto out;
+	}
 
 	nv_encoder->dp.link_bw = 27000 * dpcd[1];
 	nv_encoder->dp.link_nr = dpcd[2] & DP_MAX_LANE_COUNT_MASK;
@@ -89,21 +142,53 @@ nouveau_dp_detect(struct nouveau_encoder *nv_encoder)
 	NV_DEBUG(drm, "maximum: %dx%d\n",
 		     nv_encoder->dp.link_nr, nv_encoder->dp.link_bw);
 
-	nouveau_dp_probe_oui(dev, aux, dpcd);
+	if (mstm && mstm->can_mst) {
+		ret = nv50_mstm_detect(nv_encoder);
+		if (ret == 1) {
+			ret = NOUVEAU_DP_MST;
+			goto out;
+		} else if (ret != 0) {
+			goto out;
+		}
+	}
+	ret = NOUVEAU_DP_SST;
 
-	ret = nv50_mstm_detect(nv_encoder->dp.mstm, dpcd, nouveau_mst);
-	if (ret == 1)
-		return NOUVEAU_DP_MST;
-	if (ret == 0)
-		return NOUVEAU_DP_SST;
+out:
+	if (mstm && !mstm->suspended && ret != NOUVEAU_DP_MST)
+		nv50_mstm_remove(mstm);
+
+	mutex_unlock(&nv_encoder->dp.hpd_irq_lock);
 	return ret;
+}
+
+void nouveau_dp_irq(struct nouveau_drm *drm,
+		    struct nouveau_connector *nv_connector)
+{
+	struct drm_connector *connector = &nv_connector->base;
+	struct nouveau_encoder *outp = find_encoder(connector, DCB_OUTPUT_DP);
+	struct nv50_mstm *mstm;
+
+	if (!outp)
+		return;
+
+	mstm = outp->dp.mstm;
+	NV_DEBUG(drm, "service %s\n", connector->name);
+
+	mutex_lock(&outp->dp.hpd_irq_lock);
+
+	if (mstm && mstm->is_mst) {
+		if (!nv50_mstm_service(drm, nv_connector, mstm))
+			schedule_work(&drm->hpd_work);
+	} else {
+		drm_dp_cec_irq(&nv_connector->aux);
+	}
+
+	mutex_unlock(&outp->dp.hpd_irq_lock);
 }
 
 /* TODO:
  * - Use the minimum possible BPC here, once we add support for the max bpc
  *   property.
- * - Validate the mode against downstream port caps (see
- *   drm_dp_downstream_max_clock())
  * - Validate against the DP caps advertised by the GPU (we don't check these
  *   yet)
  */
@@ -114,18 +199,28 @@ nv50_dp_mode_valid(struct drm_connector *connector,
 		   unsigned *out_clock)
 {
 	const unsigned min_clock = 25000;
-	unsigned max_clock, clock;
-	enum drm_mode_status ret;
+	unsigned max_clock, ds_clock, clock = mode->clock;
 
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE && !outp->caps.dp_interlace)
 		return MODE_NO_INTERLACE;
 
-	max_clock = outp->dp.link_nr * outp->dp.link_bw;
-	clock = mode->clock * (connector->display_info.bpc * 3) / 10;
+	if ((mode->flags & DRM_MODE_FLAG_3D_MASK) == DRM_MODE_FLAG_3D_FRAME_PACKING)
+		clock *= 2;
 
-	ret = nouveau_conn_mode_clock_valid(mode, min_clock, max_clock,
-					    &clock);
+	max_clock = outp->dp.link_nr * outp->dp.link_bw;
+	ds_clock = drm_dp_downstream_max_clock(outp->dp.dpcd,
+					       outp->dp.downstream_ports);
+	if (ds_clock)
+		max_clock = min(max_clock, ds_clock);
+
+	clock = mode->clock * (connector->display_info.bpc * 3) / 10;
+	if (clock < min_clock)
+		return MODE_CLOCK_LOW;
+	if (clock > max_clock)
+		return MODE_CLOCK_HIGH;
+
 	if (out_clock)
 		*out_clock = clock;
-	return ret;
+
+	return MODE_OK;
 }
