@@ -698,12 +698,6 @@ static inline bool system_supports_tlb_range(void)
 		cpus_have_const_cap(ARM64_HAS_TLB_RANGE);
 }
 
-#define ARM64_BP_HARDEN_UNKNOWN		-1
-#define ARM64_BP_HARDEN_WA_NEEDED	0
-#define ARM64_BP_HARDEN_NOT_REQUIRED	1
-
-int get_spectre_v2_workaround_state(void);
-
 #define ARM64_SSBD_UNKNOWN		-1
 #define ARM64_SSBD_FORCE_DISABLE	0
 #define ARM64_SSBD_KERNEL		1
@@ -712,12 +706,8 @@ int get_spectre_v2_workaround_state(void);
 
 static inline int arm64_get_ssbd_state(void)
 {
-#ifdef CONFIG_ARM64_SSBD
 	extern int ssbd_state;
 	return ssbd_state;
-#else
-	return ARM64_SSBD_UNKNOWN;
-#endif
 }
 
 void arm64_set_ssbd_mitigation(bool state);

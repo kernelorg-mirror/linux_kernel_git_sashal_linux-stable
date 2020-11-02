@@ -116,7 +116,6 @@ el1_hvc_guest:
 			  ARM_SMCCC_ARCH_WORKAROUND_2)
 	cbnz	w1, el1_trap
 
-#ifdef CONFIG_ARM64_SSBD
 alternative_cb	arm64_enable_wa2_handling
 	b	wa2_end
 alternative_cb_end
@@ -143,7 +142,6 @@ alternative_cb_end
 wa2_end:
 	mov	x2, xzr
 	mov	x1, xzr
-#endif
 
 wa_epilogue:
 	mov	x0, xzr
@@ -288,7 +286,7 @@ SYM_CODE_START(__kvm_hyp_vector)
 	valid_vect	el1_error		// Error 32-bit EL1
 SYM_CODE_END(__kvm_hyp_vector)
 
-#ifdef CONFIG_KVM_INDIRECT_VECTORS
+#ifdef CONFIG_RANDOMIZE_BASE
 .macro hyp_ventry
 	.align 7
 1:	esb
