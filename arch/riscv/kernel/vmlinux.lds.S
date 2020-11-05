@@ -29,6 +29,22 @@ SECTIONS
 	HEAD_TEXT_SECTION
 	. = ALIGN(PAGE_SIZE);
 
+	.text : {
+		_text = .;
+		_stext = .;
+		TEXT_TEXT
+		SCHED_TEXT
+		CPUIDLE_TEXT
+		LOCK_TEXT
+		KPROBES_TEXT
+		ENTRY_TEXT
+		IRQENTRY_TEXT
+		SOFTIRQENTRY_TEXT
+		*(.fixup)
+		_etext = .;
+	}
+
+	. = ALIGN(SECTION_ALIGN);
 	__init_begin = .;
 	INIT_TEXT_SECTION(PAGE_SIZE)
 	. = ALIGN(8);
@@ -47,35 +63,24 @@ SECTIONS
 	{
 		EXIT_TEXT
 	}
+
+	__init_text_end = .;
+	. = ALIGN(SECTION_ALIGN);
+#ifdef CONFIG_EFI
+	. = ALIGN(PECOFF_SECTION_ALIGNMENT);
+	__pecoff_text_end = .;
+#endif
+	/* Start of init data section */
+	__init_data_begin = .;
+	INIT_DATA_SECTION(16)
 	.exit.data :
 	{
 		EXIT_DATA
 	}
 	PERCPU_SECTION(L1_CACHE_BYTES)
+
+	__init_data_end = .;
 	__init_end = .;
-
-	. = ALIGN(SECTION_ALIGN);
-	.text : {
-		_text = .;
-		_stext = .;
-		TEXT_TEXT
-		SCHED_TEXT
-		CPUIDLE_TEXT
-		LOCK_TEXT
-		KPROBES_TEXT
-		ENTRY_TEXT
-		IRQENTRY_TEXT
-		SOFTIRQENTRY_TEXT
-		*(.fixup)
-		_etext = .;
-	}
-
-#ifdef CONFIG_EFI
-	. = ALIGN(PECOFF_SECTION_ALIGNMENT);
-	__pecoff_text_end = .;
-#endif
-
-	INIT_DATA_SECTION(16)
 
 	/* Start of data section */
 	_sdata = .;
