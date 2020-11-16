@@ -843,6 +843,11 @@ static void meson_dw_hdmi_init(struct meson_dw_hdmi *meson_dw_hdmi)
 
 }
 
+static void meson_disable_regulator(void *data)
+{
+	regulator_disable(data);
+}
+
 static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
 				void *data)
 {
@@ -888,6 +893,10 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
 		meson_dw_hdmi->hdmi_supply = NULL;
 	} else {
 		ret = regulator_enable(meson_dw_hdmi->hdmi_supply);
+		if (ret)
+			return ret;
+		ret = devm_add_action_or_reset(dev, meson_disable_regulator,
+					       meson_dw_hdmi->hdmi_supply);
 		if (ret)
 			return ret;
 	}
