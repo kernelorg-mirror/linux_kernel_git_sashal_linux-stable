@@ -991,6 +991,10 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
 	if (ret)
 		return ret;
 
+	ret = meson_enable_clk(dev, "iahb");
+	if (ret)
+		return ret;
+
 	ret = meson_enable_clk(dev, "venci");
 	if (ret)
 		return ret;
@@ -1028,6 +1032,8 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
 
 	encoder->possible_crtcs = BIT(0);
 
+	meson_dw_hdmi_init(meson_dw_hdmi);
+
 	DRM_DEBUG_DRIVER("encoder initialized\n");
 
 	/* Bridge / Connector */
@@ -1045,8 +1051,6 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
 					    &meson_dw_hdmi->dw_plat_data);
 	if (IS_ERR(meson_dw_hdmi->hdmi))
 		return PTR_ERR(meson_dw_hdmi->hdmi);
-
-	meson_dw_hdmi_init(meson_dw_hdmi);
 
 	next_bridge = of_drm_find_bridge(pdev->dev.of_node);
 	if (next_bridge)
