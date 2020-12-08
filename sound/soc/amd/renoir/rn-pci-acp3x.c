@@ -21,6 +21,10 @@ static int snd_rn_acp_probe(struct pci_dev *pci,
 	int ret;
 	u32 addr;
 
+	/* Renoir device check */
+	if (pci->revision != 0x01)
+		return -ENODEV;
+
 	if (pci_enable_device(pci)) {
 		dev_err(&pci->dev, "pci_enable_device failed\n");
 		return -ENODEV;
