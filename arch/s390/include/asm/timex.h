@@ -141,19 +141,12 @@ static inline void local_tick_enable(unsigned long long comp)
 
 typedef unsigned long long cycles_t;
 
-static inline void get_tod_clock_ext(char *clk)
-{
-	typedef struct { char _[STORE_CLOCK_EXT_SIZE]; } addrtype;
-
-	asm volatile("stcke %0" : "=Q" (*(addrtype *) clk) : : "cc");
-}
-
 static inline unsigned long long get_tod_clock(void)
 {
-	char clk[STORE_CLOCK_EXT_SIZE];
+	union tod_clock clk;
 
-	get_tod_clock_ext(clk);
-	return *((unsigned long long *)&clk[1]);
+	store_tod_clock_ext(&clk);
+	return clk.tod;
 }
 
 static inline unsigned long long get_tod_clock_fast(void)
