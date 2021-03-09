@@ -1389,7 +1389,6 @@ static int kxcjk1013_probe(struct i2c_client *client,
 			goto err_poweroff;
 		}
 
-		data->dready_trig->dev.parent = &client->dev;
 		data->dready_trig->ops = &kxcjk1013_trigger_ops;
 		iio_trigger_set_drvdata(data->dready_trig, indio_dev);
 		indio_dev->trig = data->dready_trig;
@@ -1398,7 +1397,6 @@ static int kxcjk1013_probe(struct i2c_client *client,
 		if (ret)
 			goto err_poweroff;
 
-		data->motion_trig->dev.parent = &client->dev;
 		data->motion_trig->ops = &kxcjk1013_trigger_ops;
 		iio_trigger_set_drvdata(data->motion_trig, indio_dev);
 		ret = iio_trigger_register(data->motion_trig);
