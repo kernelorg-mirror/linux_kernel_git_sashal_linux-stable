@@ -28,6 +28,10 @@ static int snd_acp3x_probe(struct pci_dev *pci,
 	struct platform_device_info pdevinfo;
 	unsigned int irqflags;
 
+	/* Raven device detection */
+	if (pci->revision != 0x00)
+		return -ENODEV;
+
 	if (pci_enable_device(pci)) {
 		dev_err(&pci->dev, "pci_enable_device failed\n");
 		return -ENODEV;
