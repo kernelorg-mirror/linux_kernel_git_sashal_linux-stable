@@ -351,7 +351,6 @@ struct mhi_controller_config {
  * @buffer_len: Bounce buffer length
  * @bounce_buf: Use of bounce buffer
  * @fbc_download: MHI host needs to do complete image transfer (optional)
- * @pre_init: MHI host needs to do pre-initialization before power up
  * @wake_set: Device wakeup set flag
  *
  * Fields marked as (required) need to be populated by the controller driver
@@ -440,7 +439,6 @@ struct mhi_controller {
 	size_t buffer_len;
 	bool bounce_buf;
 	bool fbc_download;
-	bool pre_init;
 	bool wake_set;
 };
 
