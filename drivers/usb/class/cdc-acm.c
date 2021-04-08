@@ -962,8 +962,6 @@ static int set_serial_info(struct tty_struct *tty, struct serial_struct *ss)
 		if ((ss->close_delay != old_close_delay) ||
 		    (ss->closing_wait != old_closing_wait))
 			retval = -EPERM;
-		else
-			retval = -EOPNOTSUPP;
 	} else {
 		acm->port.close_delay  = close_delay;
 		acm->port.closing_wait = closing_wait;
