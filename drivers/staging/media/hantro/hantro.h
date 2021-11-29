@@ -72,6 +72,7 @@ struct hantro_irq {
  * @num_clocks:			number of clocks in the array
  * @reg_names:			array of register range names
  * @num_regs:			number of register range names in the array
+ * @double_buffer:		core needs double buffering
  */
 struct hantro_variant {
 	unsigned int enc_offset;
@@ -93,6 +94,7 @@ struct hantro_variant {
 	int num_clocks;
 	const char * const *reg_names;
 	int num_regs;
+	unsigned int double_buffer : 1;
 };
 
 /**
