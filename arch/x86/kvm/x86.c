@@ -633,7 +633,8 @@ int kvm_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0)
 			return 1;
 	}
 
-	if (!(cr0 & X86_CR0_PG) && kvm_read_cr4_bits(vcpu, X86_CR4_PCIDE))
+	if (!(cr0 & X86_CR0_PG) &&
+	    (is_64_bit_mode(vcpu) || kvm_read_cr4_bits(vcpu, X86_CR4_PCIDE)))
 		return 1;
 
 	kvm_x86_ops->set_cr0(vcpu, cr0);
