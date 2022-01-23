@@ -500,7 +500,10 @@ static void dcn_bw_calc_rq_dlg_ttu(
 	//input[in_idx].dout.output_standard;
 
 	/*todo: soc->sr_enter_plus_exit_time??*/
+<<<<<<< HEAD
 	dlg_sys_param.t_srx_delay_us = dc->dcn_ip->dcfclk_cstate_latency / v->dcf_clk_deep_sleep;
+=======
+>>>>>>> 6dbc67f583ab (drm/amdgpu/display: Remove t_srx_delay_us.)
 
 	dml1_rq_dlg_get_rq_params(dml, &rq_param, input.pipe.src);
 	dml1_extract_rq_regs(dml, rq_regs, rq_param);
