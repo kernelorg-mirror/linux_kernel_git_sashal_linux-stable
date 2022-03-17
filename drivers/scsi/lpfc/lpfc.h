@@ -901,6 +901,11 @@ enum lpfc_irq_chann_mode {
 	NHT_MODE,
 };
 
+enum lpfc_hba_bit_flags {
+	FABRIC_COMANDS_BLOCKED,
+	HBA_PCI_ERR,
+};
+
 struct lpfc_hba {
 	/* SCSI interface function jump table entries */
 	struct lpfc_io_buf * (*lpfc_get_scsi_buf)
@@ -1029,7 +1034,6 @@ struct lpfc_hba {
 					 * Firmware supports Forced Link Speed
 					 * capability
 					 */
-#define HBA_PCI_ERR		0x80000 /* The PCI slot is offline */
 #define HBA_FLOGI_ISSUED	0x100000 /* FLOGI was issued */
 #define HBA_CGN_RSVD1		0x200000 /* Reserved CGN flag */
 #define HBA_CGN_DAY_WRAP	0x400000 /* HBA Congestion info day wraps */
@@ -1339,7 +1343,6 @@ struct lpfc_hba {
 	atomic_t fabric_iocb_count;
 	struct timer_list fabric_block_timer;
 	unsigned long bit_flags;
-#define	FABRIC_COMANDS_BLOCKED	0
 	atomic_t num_rsrc_err;
 	atomic_t num_cmd_success;
 	unsigned long last_rsrc_error_time;
