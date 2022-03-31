@@ -155,6 +155,7 @@ static u16 vc4_ctm_s31_32_to_s0_9(u64 in)
 static void
 vc4_ctm_commit(struct vc4_dev *vc4, struct drm_atomic_state *state)
 {
+	struct vc4_hvs *hvs = vc4->hvs;
 	struct vc4_ctm_state *ctm_state = to_vc4_ctm_state(vc4->ctm_manager.state);
 	struct drm_color_ctm *ctm = ctm_state->ctm;
 
@@ -228,6 +229,7 @@ vc4_hvs_get_global_state(struct drm_atomic_state *state)
 static void vc4_hvs_pv_muxing_commit(struct vc4_dev *vc4,
 				     struct drm_atomic_state *state)
 {
+	struct vc4_hvs *hvs = vc4->hvs;
 	struct drm_crtc_state *crtc_state;
 	struct drm_crtc *crtc;
 	unsigned int i;
@@ -268,6 +270,7 @@ static void vc4_hvs_pv_muxing_commit(struct vc4_dev *vc4,
 static void vc5_hvs_pv_muxing_commit(struct vc4_dev *vc4,
 				     struct drm_atomic_state *state)
 {
+	struct vc4_hvs *hvs = vc4->hvs;
 	struct drm_crtc_state *crtc_state;
 	struct drm_crtc *crtc;
 	unsigned char mux;
@@ -351,7 +354,7 @@ static void vc4_atomic_commit_tail(struct drm_atomic_state *state)
 			continue;
 
 		vc4_crtc_state = to_vc4_crtc_state(new_crtc_state);
-		vc4_hvs_mask_underrun(dev, vc4_crtc_state->assigned_channel);
+		vc4_hvs_mask_underrun(hvs, vc4_crtc_state->assigned_channel);
 	}
 
 	old_hvs_state = vc4_hvs_get_old_global_state(state);
