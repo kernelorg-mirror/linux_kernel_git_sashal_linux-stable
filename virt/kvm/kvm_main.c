@@ -699,6 +699,12 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 	 */
 	kvm->debugfs_dentry = ERR_PTR(-ENOENT);
 
+	/*
+	 * Force subsequent debugfs file creations to fail if the VM directory
+	 * is not created.
+	 */
+	kvm->debugfs_dentry = ERR_PTR(-ENOENT);
+
 	if (!debugfs_initialized())
 		return 0;
 
