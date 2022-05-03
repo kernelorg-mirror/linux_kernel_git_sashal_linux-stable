@@ -5360,6 +5360,7 @@ int drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 	u32 quirks;
 
 	if (edid == NULL) {
+		drm_reset_display_info(connector);
 		clear_eld(connector);
 		return 0;
 	}
