@@ -505,7 +505,7 @@ TEST_F_FORK(layout1, proc_nsfs)
 			.access = LANDLOCK_ACCESS_FS_READ_FILE |
 				LANDLOCK_ACCESS_FS_WRITE_FILE,
 		},
-		{}
+		{},
 	};
 	struct landlock_path_beneath_attr path_beneath;
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access |
@@ -551,7 +551,7 @@ TEST_F_FORK(layout1, unpriv) {
 			.path = dir_s1d2,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	int ruleset_fd;
 
@@ -579,7 +579,7 @@ TEST_F_FORK(layout1, effective_access)
 			.access = LANDLOCK_ACCESS_FS_READ_FILE |
 				LANDLOCK_ACCESS_FS_WRITE_FILE,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 	char buf;
@@ -632,7 +632,7 @@ TEST_F_FORK(layout1, unhandled_access)
 			.path = dir_s1d2,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	/* Here, we only handle read accesses, not write accesses. */
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RO, rules);
@@ -666,7 +666,7 @@ TEST_F_FORK(layout1, ruleset_overlap)
 			.access = LANDLOCK_ACCESS_FS_READ_FILE |
 				LANDLOCK_ACCESS_FS_READ_DIR,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -700,14 +700,14 @@ TEST_F_FORK(layout1, non_overlapping_accesses)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_MAKE_REG,
 		},
-		{}
+		{},
 	};
 	const struct rule layer2[] = {
 		{
 			.path = dir_s1d3,
 			.access = LANDLOCK_ACCESS_FS_REMOVE_FILE,
 		},
-		{}
+		{},
 	};
 	int ruleset_fd;
 
@@ -764,7 +764,7 @@ TEST_F_FORK(layout1, interleaved_masked_accesses)
 			.path = file1_s1d3,
 			.access = LANDLOCK_ACCESS_FS_READ_FILE,
 		},
-		{}
+		{},
 	};
 	/* First rule with write restrictions. */
 	const struct rule layer2_read_write[] = {
@@ -779,7 +779,7 @@ TEST_F_FORK(layout1, interleaved_masked_accesses)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_WRITE_FILE,
 		},
-		{}
+		{},
 	};
 	const struct rule layer3_read[] = {
 		/* Allows read access via its great-grandparent directory. */
@@ -787,7 +787,7 @@ TEST_F_FORK(layout1, interleaved_masked_accesses)
 			.path = dir_s1d1,
 			.access = LANDLOCK_ACCESS_FS_READ_FILE,
 		},
-		{}
+		{},
 	};
 	const struct rule layer4_read_write[] = {
 		/*
@@ -798,7 +798,7 @@ TEST_F_FORK(layout1, interleaved_masked_accesses)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_READ_FILE,
 		},
-		{}
+		{},
 	};
 	const struct rule layer5_read[] = {
 		/*
@@ -809,7 +809,7 @@ TEST_F_FORK(layout1, interleaved_masked_accesses)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_READ_FILE,
 		},
-		{}
+		{},
 	};
 	const struct rule layer6_execute[] = {
 		/*
@@ -820,7 +820,7 @@ TEST_F_FORK(layout1, interleaved_masked_accesses)
 			.path = dir_s2d1,
 			.access = LANDLOCK_ACCESS_FS_EXECUTE,
 		},
-		{}
+		{},
 	};
 	const struct rule layer7_read_write[] = {
 		/*
@@ -831,7 +831,7 @@ TEST_F_FORK(layout1, interleaved_masked_accesses)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_WRITE_FILE,
 		},
-		{}
+		{},
 	};
 	int ruleset_fd;
 
@@ -929,7 +929,7 @@ TEST_F_FORK(layout1, inherit_subset)
 			.access = LANDLOCK_ACCESS_FS_READ_FILE |
 				LANDLOCK_ACCESS_FS_READ_DIR,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1045,7 +1045,7 @@ TEST_F_FORK(layout1, inherit_superset)
 			.path = dir_s1d3,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1081,7 +1081,7 @@ TEST_F_FORK(layout1, max_layers)
 			.path = dir_s1d2,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1143,7 +1143,7 @@ TEST_F_FORK(layout1, rule_on_mountpoint)
 			.path = dir_s3d2,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1172,7 +1172,7 @@ TEST_F_FORK(layout1, rule_over_mountpoint)
 			.path = dir_s3d1,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1200,7 +1200,7 @@ TEST_F_FORK(layout1, rule_over_root_allow_then_deny)
 			.path = "/",
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1230,7 +1230,7 @@ TEST_F_FORK(layout1, rule_over_root_deny)
 			.path = "/",
 			.access = LANDLOCK_ACCESS_FS_READ_FILE,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1250,7 +1250,7 @@ TEST_F_FORK(layout1, rule_inside_mount_ns)
 			.path = "s3d3",
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	int ruleset_fd;
 
@@ -1277,7 +1277,7 @@ TEST_F_FORK(layout1, mount_and_pivot)
 			.path = dir_s3d2,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1300,7 +1300,7 @@ TEST_F_FORK(layout1, move_mount)
 			.path = dir_s3d2,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1341,7 +1341,7 @@ TEST_F_FORK(layout1, release_inodes)
 			.path = dir_s3d3,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, ACCESS_RW, rules);
 
@@ -1379,7 +1379,7 @@ static void test_relative_path(struct __test_metadata *const _metadata,
 			.path = TMP_DIR,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	const struct rule layer2_subs[] = {
 		{
@@ -1390,7 +1390,7 @@ static void test_relative_path(struct __test_metadata *const _metadata,
 			.path = dir_s2d2,
 			.access = ACCESS_RO,
 		},
-		{}
+		{},
 	};
 	int dirfd, ruleset_fd;
 
@@ -1555,7 +1555,7 @@ TEST_F_FORK(layout1, execute)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_EXECUTE,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
 			rules);
@@ -1588,7 +1588,7 @@ TEST_F_FORK(layout1, link)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_MAKE_REG,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
 			rules);
@@ -1625,7 +1625,7 @@ TEST_F_FORK(layout1, rename_file)
 			.path = dir_s2d2,
 			.access = LANDLOCK_ACCESS_FS_REMOVE_FILE,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
 			rules);
@@ -1702,7 +1702,7 @@ TEST_F_FORK(layout1, rename_dir)
 			.path = dir_s2d1,
 			.access = LANDLOCK_ACCESS_FS_REMOVE_DIR,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
 			rules);
@@ -1756,7 +1756,7 @@ TEST_F_FORK(layout1, remove_dir)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_REMOVE_DIR,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
 			rules);
@@ -1793,7 +1793,7 @@ TEST_F_FORK(layout1, remove_file)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_REMOVE_FILE,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
 			rules);
@@ -1818,7 +1818,7 @@ static void test_make_file(struct __test_metadata *const _metadata,
 			.path = dir_s1d2,
 			.access = access,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, access, rules);
 
@@ -1904,7 +1904,7 @@ TEST_F_FORK(layout1, make_sym)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_MAKE_SYM,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
 			rules);
@@ -1949,7 +1949,7 @@ TEST_F_FORK(layout1, make_dir)
 			.path = dir_s1d2,
 			.access = LANDLOCK_ACCESS_FS_MAKE_DIR,
 		},
-		{}
+		{},
 	};
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
 			rules);
@@ -1989,7 +1989,7 @@ TEST_F_FORK(layout1, proc_unlinked_file)
 			.path = file1_s1d2,
 			.access = LANDLOCK_ACCESS_FS_READ_FILE,
 		},
-		{}
+		{},
 	};
 	int reg_fd, proc_fd;
 	const int ruleset_fd = create_ruleset(_metadata,
@@ -2031,7 +2031,7 @@ TEST_F_FORK(layout1, proc_pipe)
 			.access = LANDLOCK_ACCESS_FS_READ_FILE |
 				LANDLOCK_ACCESS_FS_WRITE_FILE,
 		},
-		{}
+		{},
 	};
 	/* Limits read and write access to files tied to the filesystem. */
 	const int ruleset_fd = create_ruleset(_metadata, rules[0].access,
@@ -2167,7 +2167,7 @@ TEST_F_FORK(layout1_bind, same_content_same_file)
 			.path = dir_s2d1,
 			.access = ACCESS_RW,
 		},
-		{}
+		{},
 	};
 	/*
 	 * Sets access rights on the same bind-mounted directories.  The result
@@ -2183,7 +2183,7 @@ TEST_F_FORK(layout1_bind, same_content_same_file)
 			.path = dir_s2d2,
 			.access = ACCESS_RW,
 		},
-		{}
+		{},
 	};
 	/* Only allow read-access to the s1d3 hierarchies. */
 	const struct rule layer3_source[] = {
@@ -2191,7 +2191,7 @@ TEST_F_FORK(layout1_bind, same_content_same_file)
 			.path = dir_s1d3,
 			.access = LANDLOCK_ACCESS_FS_READ_FILE,
 		},
-		{}
+		{},
 	};
 	/* Removes all access rights. */
 	const struct rule layer4_destination[] = {
@@ -2199,7 +2199,7 @@ TEST_F_FORK(layout1_bind, same_content_same_file)
 			.path = bind_file1_s1d3,
 			.access = LANDLOCK_ACCESS_FS_WRITE_FILE,
 		},
-		{}
+		{},
 	};
 	int ruleset_fd;
 
@@ -2301,18 +2301,18 @@ static const char lower_do1_fl3[] = LOWER_DATA "/do1/fl3";
 static const char (*lower_base_files[])[] = {
 	&lower_fl1,
 	&lower_fo1,
-	NULL
+	NULL,
 };
 static const char (*lower_base_directories[])[] = {
 	&lower_dl1,
 	&lower_do1,
-	NULL
+	NULL,
 };
 static const char (*lower_sub_files[])[] = {
 	&lower_dl1_fl2,
 	&lower_do1_fo2,
 	&lower_do1_fl3,
-	NULL
+	NULL,
 };
 
 #define UPPER_BASE	TMP_DIR "/upper"
@@ -2329,18 +2329,18 @@ static const char upper_do1_fu3[] = UPPER_DATA "/do1/fu3";
 static const char (*upper_base_files[])[] = {
 	&upper_fu1,
 	&upper_fo1,
-	NULL
+	NULL,
 };
 static const char (*upper_base_directories[])[] = {
 	&upper_du1,
 	&upper_do1,
-	NULL
+	NULL,
 };
 static const char (*upper_sub_files[])[] = {
 	&upper_du1_fu2,
 	&upper_do1_fo2,
 	&upper_do1_fu3,
-	NULL
+	NULL,
 };
 
 #define MERGE_BASE	TMP_DIR "/merge"
@@ -2361,13 +2361,13 @@ static const char (*merge_base_files[])[] = {
 	&merge_fl1,
 	&merge_fu1,
 	&merge_fo1,
-	NULL
+	NULL,
 };
 static const char (*merge_base_directories[])[] = {
 	&merge_dl1,
 	&merge_du1,
 	&merge_do1,
-	NULL
+	NULL,
 };
 static const char (*merge_sub_files[])[] = {
 	&merge_dl1_fl2,
@@ -2375,7 +2375,7 @@ static const char (*merge_sub_files[])[] = {
 	&merge_do1_fo2,
 	&merge_do1_fl3,
 	&merge_do1_fu3,
-	NULL
+	NULL,
 };
 
 /*
@@ -2539,7 +2539,7 @@ TEST_F_FORK(layout2_overlay, same_content_different_file)
 			.path = MERGE_BASE,
 			.access = ACCESS_RW,
 		},
-		{}
+		{},
 	};
 	const struct rule layer2_data[] = {
 		{
@@ -2554,7 +2554,7 @@ TEST_F_FORK(layout2_overlay, same_content_different_file)
 			.path = MERGE_DATA,
 			.access = ACCESS_RW,
 		},
-		{}
+		{},
 	};
 	/* Sets access right on directories inside both layers. */
 	const struct rule layer3_subdirs[] = {
@@ -2586,7 +2586,7 @@ TEST_F_FORK(layout2_overlay, same_content_different_file)
 			.path = merge_do1,
 			.access = ACCESS_RW,
 		},
-		{}
+		{},
 	};
 	/* Tighten access rights to the files. */
 	const struct rule layer4_files[] = {
@@ -2639,7 +2639,7 @@ TEST_F_FORK(layout2_overlay, same_content_different_file)
 			.access = LANDLOCK_ACCESS_FS_READ_FILE |
 				LANDLOCK_ACCESS_FS_WRITE_FILE,
 		},
-		{}
+		{},
 	};
 	const struct rule layer5_merge_only[] = {
 		{
@@ -2647,7 +2647,7 @@ TEST_F_FORK(layout2_overlay, same_content_different_file)
 			.access = LANDLOCK_ACCESS_FS_READ_FILE |
 				LANDLOCK_ACCESS_FS_WRITE_FILE,
 		},
-		{}
+		{},
 	};
 	int ruleset_fd;
 	size_t i;
