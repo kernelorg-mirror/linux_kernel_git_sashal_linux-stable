@@ -1583,6 +1583,13 @@ static void tc_clk_disable(void *data)
 	clk_disable_unprepare(refclk);
 }
 
+static void tc_clk_disable(void *data)
+{
+	struct clk *refclk = data;
+
+	clk_disable_unprepare(refclk);
+}
+
 static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct device *dev = &client->dev;
