@@ -54,6 +54,12 @@ else
 LDFLAGS += $(shell $(LD) --help 2>&1 | grep -q "\-z noreloc-overflow" \
 	&& echo "-z noreloc-overflow -pie --no-dynamic-linker")
 endif
+
+LDFLAGS += -z noexecstack
+ifeq ($(CONFIG_LD_IS_BFD),y)
+LDFLAGS += $(call ld-option,--no-warn-rwx-segments)
+endif
+
 LDFLAGS_vmlinux := -T
 
 hostprogs-y	:= mkpiggy
