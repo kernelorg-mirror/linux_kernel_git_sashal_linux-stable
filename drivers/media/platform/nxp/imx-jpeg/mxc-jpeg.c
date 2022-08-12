@@ -1145,6 +1145,7 @@ static int mxc_jpeg_decoder_cmd(struct file *file, void *priv,
 {
 	struct v4l2_fh *fh = file->private_data;
 	struct mxc_jpeg_ctx *ctx = mxc_jpeg_fh_to_ctx(fh);
+	unsigned long flags;
 	int ret;
 
 	ret = v4l2_m2m_ioctl_try_decoder_cmd(file, fh, cmd);
@@ -1154,7 +1155,9 @@ static int mxc_jpeg_decoder_cmd(struct file *file, void *priv,
 	if (!vb2_is_streaming(v4l2_m2m_get_src_vq(fh->m2m_ctx)))
 		return 0;
 
+	spin_lock_irqsave(&ctx->mxc_jpeg->hw_lock, flags);
 	ret = v4l2_m2m_ioctl_decoder_cmd(file, priv, cmd);
+	spin_unlock_irqrestore(&ctx->mxc_jpeg->hw_lock, flags);
 	if (ret < 0)
 		return ret;
 
@@ -1175,6 +1178,7 @@ static int mxc_jpeg_encoder_cmd(struct file *file, void *priv,
 {
 	struct v4l2_fh *fh = file->private_data;
 	struct mxc_jpeg_ctx *ctx = mxc_jpeg_fh_to_ctx(fh);
+	unsigned long flags;
 	int ret;
 
 	ret = v4l2_m2m_ioctl_try_encoder_cmd(file, fh, cmd);
@@ -1185,7 +1189,9 @@ static int mxc_jpeg_encoder_cmd(struct file *file, void *priv,
 	    !vb2_is_streaming(v4l2_m2m_get_dst_vq(fh->m2m_ctx)))
 		return 0;
 
+	spin_lock_irqsave(&ctx->mxc_jpeg->hw_lock, flags);
 	ret = v4l2_m2m_ioctl_encoder_cmd(file, fh, cmd);
+	spin_unlock_irqrestore(&ctx->mxc_jpeg->hw_lock, flags);
 	if (ret < 0)
 		return 0;
 
