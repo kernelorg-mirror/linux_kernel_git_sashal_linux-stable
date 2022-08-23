@@ -3743,6 +3743,10 @@ enable_82xx_npiv:
 			    "ISP Firmware failed checksum.\n");
 			goto failed;
 		}
+
+		/* Enable PUREX PASSTHRU */
+		if (ql2xsmartsan)
+			qla25xx_set_els_cmds_supported(vha);
 	} else
 		goto failed;
 
@@ -3963,7 +3967,7 @@ qla24xx_update_fw_options(scsi_qla_host_t *vha)
 
 	/* Update Serial Link options. */
 	if ((le16_to_cpu(ha->fw_seriallink_options24[0]) & BIT_0) == 0)
-		return;
+		goto enable_purex;
 
 	rval = qla2x00_set_serdes_params(vha,
 	    le16_to_cpu(ha->fw_seriallink_options24[1]),
@@ -3973,6 +3977,12 @@ qla24xx_update_fw_options(scsi_qla_host_t *vha)
 		ql_log(ql_log_warn, vha, 0x0104,
 		    "Unable to update Serial Link options (%x).\n", rval);
 	}
+
+enable_purex:
+	if (ql2xsmartsan)
+		ha->fw_options[1] |= ADD_FO1_ENABLE_PUREX_IOCB;
+
+	qla2x00_set_fw_options(vha, ha->fw_options);
 }
 
 void
@@ -4174,6 +4184,8 @@ qla2x00_init_rings(scsi_qla_host_t *vha)
 		    (mid_init_cb->init_cb.firmware_options_1 & BIT_6) != 0;
 		ql_dbg(ql_dbg_init, vha, 0x00bc, "FA-WWPN Support: %s.\n",
 		    (ha->flags.fawwpn_enabled) ? "enabled" : "disabled");
+		/* Init_cb will be reused for other command(s).  Save a backup copy of port_name */
+		memcpy(ha->port_name, ha->init_cb->port_name, WWN_SIZE);
 	}
 
 	rval = qla2x00_init_firmware(vha, ha->init_cb_size);
@@ -5613,23 +5625,21 @@ qla2x00_configure_fabric(scsi_qla_host_t *vha)
 	}
 	vha->device_flags |= SWITCH_FOUND;
 
+	rval = qla2x00_get_port_name(vha, loop_id, vha->fabric_port_name, 0);
+	if (rval != QLA_SUCCESS)
+		ql_dbg(ql_dbg_disc, vha, 0x20ff,
+		    "Failed to get Fabric Port Name\n");
 
 	if (qla_tgt_mode_enabled(vha) || qla_dual_mode_enabled(vha)) {
 		rval = qla2x00_send_change_request(vha, 0x3, 0);
 		if (rval != QLA_SUCCESS)
 			ql_log(ql_log_warn, vha, 0x121,
-				"Failed to enable receiving of RSCN requests: 0x%x.\n",
-				rval);
+			    "Failed to enable receiving of RSCN requests: 0x%x.\n",
+			    rval);
 	}
-
 
 	do {
 		qla2x00_mgmt_svr_login(vha);
-
-		/* FDMI support. */
-		if (ql2xfdmienable &&
-		    test_and_clear_bit(REGISTER_FDMI_NEEDED, &vha->dpc_flags))
-			qla2x00_fdmi_register(vha);
 
 		/* Ensure we are logged into the SNS. */
 		loop_id = NPH_SNS_LID(ha);
@@ -5642,6 +5652,12 @@ qla2x00_configure_fabric(scsi_qla_host_t *vha)
 			set_bit(LOOP_RESYNC_NEEDED, &vha->dpc_flags);
 			return rval;
 		}
+
+		/* FDMI support. */
+		if (ql2xfdmienable &&
+		    test_and_clear_bit(REGISTER_FDMI_NEEDED, &vha->dpc_flags))
+			qla2x00_fdmi_register(vha);
+
 		if (test_and_clear_bit(REGISTER_FC4_NEEDED, &vha->dpc_flags)) {
 			if (qla2x00_rft_id(vha)) {
 				/* EMPTY */
@@ -8736,6 +8752,17 @@ qla82xx_restart_isp(scsi_qla_host_t *vha)
 	}
 
 	return status;
+}
+
+void
+qla83xx_update_fw_options(scsi_qla_host_t *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+
+	if (ql2xsmartsan)
+		ha->fw_options[1] |= ADD_FO1_ENABLE_PUREX_IOCB;
+
+	qla2x00_set_fw_options(vha, ha->fw_options);
 }
 
 void

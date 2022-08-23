@@ -31,6 +31,9 @@
 #define PDO_FORCE_ADISC		BIT_1
 #define PDO_FORCE_PLOGI		BIT_0
 
+struct buffer_credit_24xx {
+	u32 parameter[28];
+};
 
 #define	PORT_DATABASE_24XX_SIZE		64
 struct port_database_24xx {
@@ -719,6 +722,50 @@ struct ct_entry_24xx {
 
 	struct dsd64 dsd[2];
 };
+
+/*
+ * ISP queue - PUREX IOCB entry structure definition
+ */
+#define PUREX_IOCB_TYPE		0x51	/* CT Pass Through IOCB entry */
+typedef struct purex_entry_24xx {
+	uint8_t entry_type;		/* Entry type. */
+	uint8_t entry_count;		/* Entry count. */
+	uint8_t sys_define;		/* System defined. */
+	uint8_t entry_status;		/* Entry Status. */
+
+	uint16_t reserved1;
+	uint8_t vp_idx;
+	uint8_t reserved2;
+
+	uint16_t status_flags;
+	uint16_t nport_handle;
+
+	uint16_t frame_size;
+	uint16_t trunc_frame_size;
+
+	uint32_t rx_xchg_addr;
+
+	uint8_t d_id[3];
+	uint8_t r_ctl;
+
+	uint8_t s_id[3];
+	uint8_t cs_ctl;
+
+	uint8_t f_ctl[3];
+	uint8_t type;
+
+	uint16_t seq_cnt;
+	uint8_t df_ctl;
+	uint8_t seq_id;
+
+	uint16_t rx_id;
+	uint16_t ox_id;
+	uint32_t param;
+
+	uint8_t els_frame_payload[20];
+} purex_entry_24xx_t;
+
+#define PUREX_ENTRY_SIZE	(sizeof(purex_entry_24xx_t))
 
 /*
  * ISP queue - ELS Pass-Through entry structure definition.
@@ -1881,6 +1928,7 @@ struct nvram_81xx {
 	 * BIT 6-15 = Unused
 	 */
 	uint16_t enhanced_features;
+
 	uint16_t reserved_24[4];
 
 	/* Offset 416. */

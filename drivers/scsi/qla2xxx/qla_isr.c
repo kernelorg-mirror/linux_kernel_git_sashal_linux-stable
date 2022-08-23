@@ -31,6 +31,13 @@ const char *const port_state_str[] = {
 	"ONLINE"
 };
 
+static void qla24xx_purex_iocb(scsi_qla_host_t *vha, struct req_que *req,
+	struct sts_entry_24xx *pkt)
+{
+	memcpy(vha->purex_data, pkt, PUREX_ENTRY_SIZE);
+	set_bit(PROCESS_PUREX_IOCB, &vha->dpc_flags);
+}
+
 /**
  * qla2100_intr_handler() - Process interrupts for the ISP2100 and ISP2200.
  * @irq: interrupt number
@@ -846,9 +853,7 @@ skip_rio:
 			if (!vha->vp_idx) {
 				if (ha->flags.fawwpn_enabled &&
 				    (ha->current_topology == ISP_CFG_F)) {
-					void *wwpn = ha->init_cb->port_name;
-
-					memcpy(vha->port_name, wwpn, WWN_SIZE);
+					memcpy(vha->port_name, ha->port_name, WWN_SIZE);
 					fc_host_port_name(vha->host) =
 					    wwn_to_u64(vha->port_name);
 					ql_dbg(ql_dbg_init + ql_dbg_verbose,
@@ -3086,6 +3091,9 @@ process_err:
 		case VP_CTRL_IOCB_TYPE:
 			qla_ctrlvp_completed(vha, rsp->req,
 			    (struct vp_ctrl_entry_24xx *)pkt);
+			break;
+		case PUREX_IOCB_TYPE:
+			qla24xx_purex_iocb(vha, rsp->req, pkt);
 			break;
 		default:
 			/* Type Not Supported. */
