@@ -277,6 +277,27 @@ MODULE_PARM_DESC(qla2xuseresexchforels,
 		 "Reserve 1/2 of emergency exchanges for ELS.\n"
 		 " 0 (default): disabled");
 
+int ql2xprotmask;
+module_param(ql2xprotmask, int, 0644);
+MODULE_PARM_DESC(ql2xprotmask,
+		 "Override DIF/DIX protection capabilities mask\n"
+		 "Default is 0 which sets protection mask based on "
+		 "capabilities reported by HBA firmware.\n");
+
+int ql2xprotguard;
+module_param(ql2xprotguard, int, 0644);
+MODULE_PARM_DESC(ql2xprotguard, "Override choice of DIX checksum\n"
+		 "  0 -- Let HBA firmware decide\n"
+		 "  1 -- Force T10 CRC\n"
+		 "  2 -- Force IP checksum\n");
+
+int ql2xdifbundlinginternalbuffers;
+module_param(ql2xdifbundlinginternalbuffers, int, 0644);
+MODULE_PARM_DESC(ql2xdifbundlinginternalbuffers,
+    "Force using internal buffers for DIF information\n"
+    "0 (Default). Based on check.\n"
+    "1 Force using internal buffers\n");
+
 /*
  * SCSI host template entry points
  */
@@ -795,7 +816,44 @@ qla2xxx_qpair_sp_free_dma(void *ptr)
 		ha->gbl_dsd_inuse -= ctx1->dsd_use_cnt;
 		ha->gbl_dsd_avail += ctx1->dsd_use_cnt;
 		mempool_free(ctx1, ha->ctx_mempool);
+		sp->flags &= ~SRB_FCP_CMND_DMA_VALID;
 	}
+	if (sp->flags & SRB_DIF_BUNDL_DMA_VALID) {
+		struct crc_context *difctx = sp->u.scmd.ctx;
+		struct dsd_dma *dif_dsd, *nxt_dsd;
+
+		list_for_each_entry_safe(dif_dsd, nxt_dsd,
+		    &difctx->ldif_dma_hndl_list, list) {
+			list_del(&dif_dsd->list);
+			dma_pool_free(ha->dif_bundl_pool, dif_dsd->dsd_addr,
+			    dif_dsd->dsd_list_dma);
+			kfree(dif_dsd);
+			difctx->no_dif_bundl--;
+		}
+
+		list_for_each_entry_safe(dif_dsd, nxt_dsd,
+		    &difctx->ldif_dsd_list, list) {
+			list_del(&dif_dsd->list);
+			dma_pool_free(ha->dl_dma_pool, dif_dsd->dsd_addr,
+			    dif_dsd->dsd_list_dma);
+			kfree(dif_dsd);
+			difctx->no_ldif_dsd--;
+		}
+
+		if (difctx->no_ldif_dsd) {
+			ql_dbg(ql_dbg_tgt+ql_dbg_verbose, sp->vha, 0xe022,
+			    "%s: difctx->no_ldif_dsd=%x\n",
+			    __func__, difctx->no_ldif_dsd);
+		}
+
+		if (difctx->no_dif_bundl) {
+			ql_dbg(ql_dbg_tgt+ql_dbg_verbose, sp->vha, 0xe022,
+			    "%s: difctx->no_dif_bundl=%x\n",
+			    __func__, difctx->no_dif_bundl);
+		}
+		sp->flags &= ~SRB_DIF_BUNDL_DMA_VALID;
+	}
+
 end:
 	CMD_SP(cmd) = NULL;
 	qla2xxx_rel_qpair_sp(sp->qpair, sp);
@@ -2800,6 +2858,8 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	atomic_set(&ha->num_pend_mbx_stage1, 0);
 	atomic_set(&ha->num_pend_mbx_stage2, 0);
 	atomic_set(&ha->num_pend_mbx_stage3, 0);
+	atomic_set(&ha->zio_threshold, DEFAULT_ZIO_THRESHOLD);
+	ha->last_zio_threshold = DEFAULT_ZIO_THRESHOLD;
 
 	/* Assign ISP specific operations. */
 	if (IS_QLA2100(ha)) {
@@ -3293,13 +3353,16 @@ skip_dpc:
 			    "Registering for DIF/DIX type 1 and 3 protection.\n");
 			if (ql2xenabledif == 1)
 				prot = SHOST_DIX_TYPE0_PROTECTION;
-			scsi_host_set_prot(host,
-			    prot | SHOST_DIF_TYPE1_PROTECTION
-			    | SHOST_DIF_TYPE2_PROTECTION
-			    | SHOST_DIF_TYPE3_PROTECTION
-			    | SHOST_DIX_TYPE1_PROTECTION
-			    | SHOST_DIX_TYPE2_PROTECTION
-			    | SHOST_DIX_TYPE3_PROTECTION);
+			if (ql2xprotmask)
+				scsi_host_set_prot(host, ql2xprotmask);
+			else
+				scsi_host_set_prot(host,
+				    prot | SHOST_DIF_TYPE1_PROTECTION
+				    | SHOST_DIF_TYPE2_PROTECTION
+				    | SHOST_DIF_TYPE3_PROTECTION
+				    | SHOST_DIX_TYPE1_PROTECTION
+				    | SHOST_DIX_TYPE2_PROTECTION
+				    | SHOST_DIX_TYPE3_PROTECTION);
 
 			guard = SHOST_DIX_GUARD_CRC;
 
@@ -3307,7 +3370,10 @@ skip_dpc:
 			    (ql2xenabledif > 1 || IS_PI_DIFB_DIX0_CAPABLE(ha)))
 				guard |= SHOST_DIX_GUARD_IP;
 
-			scsi_host_set_guard(host, guard);
+			if (ql2xprotguard)
+				scsi_host_set_guard(host, ql2xprotguard);
+			else
+				scsi_host_set_guard(host, guard);
 		} else
 			base_vha->flags.difdix_supported = 0;
 	}
@@ -3958,9 +4024,86 @@ qla2x00_mem_alloc(struct qla_hw_data *ha, uint16_t req_len, uint16_t rsp_len,
 			    "Failed to allocate memory for fcp_cmnd_dma_pool.\n");
 			goto fail_dl_dma_pool;
 		}
+
+		if (ql2xenabledif) {
+			u64 bufsize = DIF_BUNDLING_DMA_POOL_SIZE;
+			struct dsd_dma *dsd, *nxt;
+			uint i;
+			/* Creata a DMA pool of buffers for DIF bundling */
+			ha->dif_bundl_pool = dma_pool_create(name,
+			    &ha->pdev->dev, DIF_BUNDLING_DMA_POOL_SIZE, 8, 0);
+			if (!ha->dif_bundl_pool) {
+				ql_dbg_pci(ql_dbg_init, ha->pdev, 0x0024,
+				    "%s: failed create dif_bundl_pool\n",
+				    __func__);
+				goto fail_dif_bundl_dma_pool;
+			}
+
+			INIT_LIST_HEAD(&ha->pool.good.head);
+			INIT_LIST_HEAD(&ha->pool.unusable.head);
+			ha->pool.good.count = 0;
+			ha->pool.unusable.count = 0;
+			for (i = 0; i < 128; i++) {
+				dsd = kzalloc(sizeof(*dsd), GFP_ATOMIC);
+				if (!dsd) {
+					ql_dbg_pci(ql_dbg_init, ha->pdev,
+					    0xe0ee, "%s: failed alloc dsd\n",
+					    __func__);
+					return 1;
+				}
+				ha->dif_bundle_kallocs++;
+
+				dsd->dsd_addr = dma_pool_alloc(
+				    ha->dif_bundl_pool, GFP_ATOMIC,
+				    &dsd->dsd_list_dma);
+				if (!dsd->dsd_addr) {
+					ql_dbg_pci(ql_dbg_init, ha->pdev,
+					    0xe0ee,
+					    "%s: failed alloc ->dsd_addr\n",
+					    __func__);
+					kfree(dsd);
+					ha->dif_bundle_kallocs--;
+					continue;
+				}
+				ha->dif_bundle_dma_allocs++;
+
+				/*
+				 * if DMA buffer crosses 4G boundary,
+				 * put it on bad list
+				 */
+				if (MSD(dsd->dsd_list_dma) ^
+				    MSD(dsd->dsd_list_dma + bufsize)) {
+					list_add_tail(&dsd->list,
+					    &ha->pool.unusable.head);
+					ha->pool.unusable.count++;
+				} else {
+					list_add_tail(&dsd->list,
+					    &ha->pool.good.head);
+					ha->pool.good.count++;
+				}
+			}
+
+			/* return the good ones back to the pool */
+			list_for_each_entry_safe(dsd, nxt,
+			    &ha->pool.good.head, list) {
+				list_del(&dsd->list);
+				dma_pool_free(ha->dif_bundl_pool,
+				    dsd->dsd_addr, dsd->dsd_list_dma);
+				ha->dif_bundle_dma_allocs--;
+				kfree(dsd);
+				ha->dif_bundle_kallocs--;
+			}
+
+			ql_dbg_pci(ql_dbg_init, ha->pdev, 0x0024,
+			    "%s: dif dma pool (good=%u unusable=%u)\n",
+			    __func__, ha->pool.good.count,
+			    ha->pool.unusable.count);
+		}
+
 		ql_dbg_pci(ql_dbg_init, ha->pdev, 0x0025,
-		    "dl_dma_pool=%p fcp_cmnd_dma_pool=%p.\n",
-		    ha->dl_dma_pool, ha->fcp_cmnd_dma_pool);
+		    "dl_dma_pool=%p fcp_cmnd_dma_pool=%p dif_bundl_pool=%p.\n",
+		    ha->dl_dma_pool, ha->fcp_cmnd_dma_pool,
+		    ha->dif_bundl_pool);
 	}
 
 	/* Allocate memory for SNS commands */
@@ -4125,6 +4268,24 @@ fail_free_ms_iocb:
 		dma_free_coherent(&ha->pdev->dev, sizeof(struct sns_cmd_pkt),
 		    ha->sns_cmd, ha->sns_cmd_dma);
 fail_dma_pool:
+	if (ql2xenabledif) {
+		struct dsd_dma *dsd, *nxt;
+
+		list_for_each_entry_safe(dsd, nxt, &ha->pool.unusable.head,
+		    list) {
+			list_del(&dsd->list);
+			dma_pool_free(ha->dif_bundl_pool, dsd->dsd_addr,
+			    dsd->dsd_list_dma);
+			ha->dif_bundle_dma_allocs--;
+			kfree(dsd);
+			ha->dif_bundle_kallocs--;
+			ha->pool.unusable.count--;
+		}
+		dma_pool_destroy(ha->dif_bundl_pool);
+		ha->dif_bundl_pool = NULL;
+	}
+
+fail_dif_bundl_dma_pool:
 	if (IS_QLA82XX(ha) || ql2xenabledif) {
 		dma_pool_destroy(ha->fcp_cmnd_dma_pool);
 		ha->fcp_cmnd_dma_pool = NULL;
@@ -4246,29 +4407,34 @@ static void
 qla2x00_number_of_exch(scsi_qla_host_t *vha, u32 *ret_cnt, u16 max_cnt)
 {
 	u32 temp;
+	struct init_cb_81xx *icb = (struct init_cb_81xx *)&vha->hw->init_cb;
 	*ret_cnt = FW_DEF_EXCHANGES_CNT;
 
 	if (max_cnt > vha->hw->max_exchg)
 		max_cnt = vha->hw->max_exchg;
 
 	if (qla_ini_mode_enabled(vha)) {
-		if (ql2xiniexchg > max_cnt)
-			ql2xiniexchg = max_cnt;
+		if (vha->ql2xiniexchg > max_cnt)
+			vha->ql2xiniexchg = max_cnt;
 
-		if (ql2xiniexchg > FW_DEF_EXCHANGES_CNT)
-			*ret_cnt = ql2xiniexchg;
+		if (vha->ql2xiniexchg > FW_DEF_EXCHANGES_CNT)
+			*ret_cnt = vha->ql2xiniexchg;
+
 	} else if (qla_tgt_mode_enabled(vha)) {
-		if (ql2xexchoffld > max_cnt)
-			ql2xexchoffld = max_cnt;
+		if (vha->ql2xexchoffld > max_cnt) {
+			vha->ql2xexchoffld = max_cnt;
+			icb->exchange_count = cpu_to_le16(vha->ql2xexchoffld);
+		}
 
-		if (ql2xexchoffld > FW_DEF_EXCHANGES_CNT)
-			*ret_cnt = ql2xexchoffld;
+		if (vha->ql2xexchoffld > FW_DEF_EXCHANGES_CNT)
+			*ret_cnt = vha->ql2xexchoffld;
 	} else if (qla_dual_mode_enabled(vha)) {
-		temp = ql2xiniexchg + ql2xexchoffld;
+		temp = vha->ql2xiniexchg + vha->ql2xexchoffld;
 		if (temp > max_cnt) {
-			ql2xiniexchg -= (temp - max_cnt)/2;
-			ql2xexchoffld -= (((temp - max_cnt)/2) + 1);
+			vha->ql2xiniexchg -= (temp - max_cnt)/2;
+			vha->ql2xexchoffld -= (((temp - max_cnt)/2) + 1);
 			temp = max_cnt;
+			icb->exchange_count = cpu_to_le16(vha->ql2xexchoffld);
 		}
 
 		if (temp > FW_DEF_EXCHANGES_CNT)
@@ -4306,6 +4472,12 @@ qla2x00_set_exchoffld_buffer(scsi_qla_host_t *vha)
 
 	if (totsz != ha->exchoffld_size) {
 		qla2x00_free_exchoffld_buffer(ha);
+		if (actual_cnt <= FW_DEF_EXCHANGES_CNT) {
+			ha->exchoffld_size = 0;
+			ha->flags.exchoffld_enabled = 0;
+			return QLA_SUCCESS;
+		}
+
 		ha->exchoffld_size = totsz;
 
 		ql_log(ql_log_info, vha, 0xd016,
@@ -4338,6 +4510,15 @@ qla2x00_set_exchoffld_buffer(scsi_qla_host_t *vha)
 
 			return -ENOMEM;
 		}
+	} else if (!ha->exchoffld_buf || (actual_cnt <= FW_DEF_EXCHANGES_CNT)) {
+		/* pathological case */
+		qla2x00_free_exchoffld_buffer(ha);
+		ha->exchoffld_size = 0;
+		ha->flags.exchoffld_enabled = 0;
+		ql_log(ql_log_info, vha, 0xd016,
+		    "Exchange offload not enable: offld size=%d, actual count=%d entry sz=0x%x, total sz=0x%x.\n",
+		    ha->exchoffld_size, actual_cnt, size, totsz);
+		return 0;
 	}
 
 	/* Now configure the dma buffer */
@@ -4353,7 +4534,7 @@ qla2x00_set_exchoffld_buffer(scsi_qla_host_t *vha)
 		if (qla_ini_mode_enabled(vha))
 			icb->exchange_count = 0;
 		else
-			icb->exchange_count = cpu_to_le16(ql2xexchoffld);
+			icb->exchange_count = cpu_to_le16(vha->ql2xexchoffld);
 	}
 
 	return rval;
@@ -4492,6 +4673,32 @@ qla2x00_mem_free(struct qla_hw_data *ha)
 	if (ha->ctx_mempool)
 		mempool_destroy(ha->ctx_mempool);
 
+	if (ql2xenabledif) {
+		struct dsd_dma *dsd, *nxt;
+
+		list_for_each_entry_safe(dsd, nxt, &ha->pool.unusable.head,
+					 list) {
+			list_del(&dsd->list);
+			dma_pool_free(ha->dif_bundl_pool, dsd->dsd_addr,
+				      dsd->dsd_list_dma);
+			ha->dif_bundle_dma_allocs--;
+			kfree(dsd);
+			ha->dif_bundle_kallocs--;
+			ha->pool.unusable.count--;
+		}
+		list_for_each_entry_safe(dsd, nxt, &ha->pool.good.head, list) {
+			list_del(&dsd->list);
+			dma_pool_free(ha->dif_bundl_pool, dsd->dsd_addr,
+				      dsd->dsd_list_dma);
+			ha->dif_bundle_dma_allocs--;
+			kfree(dsd);
+			ha->dif_bundle_kallocs--;
+		}
+	}
+
+	if (ha->dif_bundl_pool)
+		dma_pool_destroy(ha->dif_bundl_pool);
+
 	qlt_mem_free(ha);
 
 	if (ha->init_cb)
@@ -4560,6 +4767,10 @@ struct scsi_qla_host *qla2x00_create_host(struct scsi_host_template *sht,
 	vha->host = host;
 	vha->host_no = host->host_no;
 	vha->hw = ha;
+
+	vha->qlini_mode = ql2x_ini_mode;
+	vha->ql2xexchoffld = ql2xexchoffld;
+	vha->ql2xiniexchg = ql2xiniexchg;
 
 	INIT_LIST_HEAD(&vha->vp_fcports);
 	INIT_LIST_HEAD(&vha->work_list);
@@ -6048,15 +6259,17 @@ qla2x00_do_dpc(void *data)
 		    !test_bit(UNLOADING, &base_vha->dpc_flags)) {
 			bool do_reset = true;
 
-			switch (ql2x_ini_mode) {
+			switch (base_vha->qlini_mode) {
 			case QLA2XXX_INI_MODE_ENABLED:
 				break;
 			case QLA2XXX_INI_MODE_DISABLED:
-				if (!qla_tgt_mode_enabled(base_vha))
+				if (!qla_tgt_mode_enabled(base_vha) &&
+				    !ha->flags.fw_started)
 					do_reset = false;
 				break;
 			case QLA2XXX_INI_MODE_DUAL:
-				if (!qla_dual_mode_enabled(base_vha))
+				if (!qla_dual_mode_enabled(base_vha) &&
+				    !ha->flags.fw_started)
 					do_reset = false;
 				break;
 			default:
@@ -6203,15 +6416,26 @@ intr_on_check:
 			mutex_unlock(&ha->mq_lock);
 		}
 
-		if (test_and_clear_bit(SET_ZIO_THRESHOLD_NEEDED, &base_vha->dpc_flags)) {
+		if (test_and_clear_bit(SET_NVME_ZIO_THRESHOLD_NEEDED,
+		    &base_vha->dpc_flags)) {
 			ql_log(ql_log_info, base_vha, 0xffffff,
 				"nvme: SET ZIO Activity exchange threshold to %d.\n",
 						ha->nvme_last_rptd_aen);
-			if (qla27xx_set_zio_threshold(base_vha, ha->nvme_last_rptd_aen)) {
+			if (qla27xx_set_zio_threshold(base_vha,
+			    ha->nvme_last_rptd_aen)) {
 				ql_log(ql_log_info, base_vha, 0xffffff,
-					"nvme: Unable to SET ZIO Activity exchange threshold to %d.\n",
-						ha->nvme_last_rptd_aen);
+				    "nvme: Unable to SET ZIO Activity exchange threshold to %d.\n",
+				    ha->nvme_last_rptd_aen);
 			}
+		}
+
+		if (test_and_clear_bit(SET_ZIO_THRESHOLD_NEEDED,
+		    &base_vha->dpc_flags)) {
+			ql_log(ql_log_info, base_vha, 0xffffff,
+			    "SET ZIO Activity exchange threshold to %d.\n",
+			    ha->last_zio_threshold);
+			qla27xx_set_zio_threshold(base_vha,
+			    ha->last_zio_threshold);
 		}
 
 		if (!IS_QLAFX00(ha))
@@ -6426,13 +6650,24 @@ qla2x00_timer(struct timer_list *t)
 	 * FC-NVME
 	 * see if the active AEN count has changed from what was last reported.
 	 */
-	if (!vha->vp_idx &&
-		atomic_read(&ha->nvme_active_aen_cnt) != ha->nvme_last_rptd_aen &&
-		ha->zio_mode == QLA_ZIO_MODE_6) {
+	if (!vha->vp_idx && (atomic_read(&ha->nvme_active_aen_cnt) !=
+	    ha->nvme_last_rptd_aen) && ha->zio_mode == QLA_ZIO_MODE_6) {
 		ql_log(ql_log_info, vha, 0x3002,
-			"nvme: Sched: Set ZIO exchange threshold to %d.\n",
-			ha->nvme_last_rptd_aen);
+		    "nvme: Sched: Set ZIO exchange threshold to %d.\n",
+		    ha->nvme_last_rptd_aen);
 		ha->nvme_last_rptd_aen = atomic_read(&ha->nvme_active_aen_cnt);
+		set_bit(SET_NVME_ZIO_THRESHOLD_NEEDED, &vha->dpc_flags);
+		start_dpc++;
+	}
+
+	if (!vha->vp_idx &&
+	    (atomic_read(&ha->zio_threshold) != ha->last_zio_threshold) &&
+	    (ha->zio_mode == QLA_ZIO_MODE_6) &&
+	    (IS_QLA83XX(ha) || IS_QLA27XX(ha))) {
+		ql_log(ql_log_info, vha, 0x3002,
+		    "Sched: Set ZIO exchange threshold to %d.\n",
+		    ha->last_zio_threshold);
+		ha->last_zio_threshold = atomic_read(&ha->zio_threshold);
 		set_bit(SET_ZIO_THRESHOLD_NEEDED, &vha->dpc_flags);
 		start_dpc++;
 	}
@@ -6964,6 +7199,9 @@ qla2x00_module_init(void)
 		strcat(qla2x00_version_str, "-debug");
 	if (ql2xextended_error_logging == 1)
 		ql2xextended_error_logging = QL_DBG_DEFAULT1_MASK;
+
+	if (ql2x_ini_mode == QLA2XXX_INI_MODE_DUAL)
+		qla_insert_tgt_attrs();
 
 	qla2xxx_transport_template =
 	    fc_attach_transport(&qla2xxx_transport_functions);

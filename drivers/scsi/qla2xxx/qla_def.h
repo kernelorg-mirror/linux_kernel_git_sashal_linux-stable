@@ -314,6 +314,7 @@ struct srb_cmd {
 #define SRB_CRC_PROT_DMA_VALID		BIT_4	/* DIF: prot DMA valid */
 #define SRB_CRC_CTX_DSD_VALID		BIT_5	/* DIF: dsd_list valid */
 #define SRB_WAKEUP_ON_COMP		BIT_6
+#define SRB_DIF_BUNDL_DMA_VALID		BIT_7   /* DIF: DMA list valid */
 
 /* To identify if a srb is of T10-CRC type. @sp => srb_t pointer */
 #define IS_PROT_IO(sp)	(sp->flags & SRB_CRC_CTX_DSD_VALID)
@@ -1891,6 +1892,13 @@ struct crc_context {
 	/* List of DMA context transfers */
 	struct list_head dsd_list;
 
+	/* List of DIF Bundling context DMA address */
+	struct list_head ldif_dsd_list;
+	u8 no_ldif_dsd;
+
+	struct list_head ldif_dma_hndl_list;
+	u32 dif_bundl_len;
+	u8 no_dif_bundl;
 	/* This structure should not exceed 512 bytes */
 };
 
@@ -3688,12 +3696,14 @@ struct qla_hw_data {
 #define PORT_SPEED_UNKNOWN 0xFFFF
 #define PORT_SPEED_1GB  0x00
 #define PORT_SPEED_2GB  0x01
+#define PORT_SPEED_AUTO 0x02
 #define PORT_SPEED_4GB  0x03
 #define PORT_SPEED_8GB  0x04
 #define PORT_SPEED_16GB 0x05
 #define PORT_SPEED_32GB 0x06
 #define PORT_SPEED_10GB	0x13
 	uint16_t	link_data_rate;         /* F/W operating speed */
+	uint16_t	set_data_rate;		/* Set by user */
 
 	uint8_t		current_topology;
 	uint8_t		prev_topology;
@@ -4184,8 +4194,32 @@ struct qla_hw_data {
 	uint16_t min_link_speed;
 	uint16_t max_speed_sup;
 
+	/* DMA pool for the DIF bundling buffers */
+	struct dma_pool *dif_bundl_pool;
+	#define DIF_BUNDLING_DMA_POOL_SIZE  1024
+	struct {
+		struct {
+			struct list_head head;
+			uint count;
+		} good;
+		struct {
+			struct list_head head;
+			uint count;
+		} unusable;
+	} pool;
+
+	unsigned long long dif_bundle_crossed_pages;
+	unsigned long long dif_bundle_reads;
+	unsigned long long dif_bundle_writes;
+	unsigned long long dif_bundle_kallocs;
+	unsigned long long dif_bundle_dma_allocs;
+
 	atomic_t        nvme_active_aen_cnt;
 	uint16_t        nvme_last_rptd_aen;             /* Last recorded aen count */
+
+	atomic_t zio_threshold;
+	uint16_t last_zio_threshold;
+#define DEFAULT_ZIO_THRESHOLD 64
 };
 
 #define FW_ABILITY_MAX_SPEED_MASK	0xFUL
@@ -4193,6 +4227,10 @@ struct qla_hw_data {
 #define FW_ABILITY_MAX_SPEED_32G	0x1
 #define FW_ABILITY_MAX_SPEED(ha)	\
 	(ha->fw_ability_mask & FW_ABILITY_MAX_SPEED_MASK)
+
+#define QLA_GET_DATA_RATE	0
+#define QLA_SET_DATA_RATE_NOLR	1
+#define QLA_SET_DATA_RATE_LR	2 /* Set speed and initiate LR */
 
 /*
  * Qlogic scsi host structure
@@ -4265,10 +4303,11 @@ typedef struct scsi_qla_host {
 #define FX00_CRITEMP_RECOVERY	25
 #define FX00_HOST_INFO_RESEND	26
 #define QPAIR_ONLINE_CHECK_NEEDED	27
-#define SET_ZIO_THRESHOLD_NEEDED	28
+#define SET_NVME_ZIO_THRESHOLD_NEEDED	28
 #define DETECT_SFP_CHANGE	29
 #define N2N_LOGIN_NEEDED	30
 #define IOCB_WORK_ACTIVE	31
+#define SET_ZIO_THRESHOLD_NEEDED 32
 
 	unsigned long	pci_flags;
 #define PFLG_DISCONNECTED	0	/* PCI device removed */
@@ -4371,6 +4410,13 @@ typedef struct scsi_qla_host {
 	atomic_t	vref_count;
 	struct qla8044_reset_template reset_tmplt;
 	uint16_t	bbcr;
+
+	uint16_t u_ql2xexchoffld;
+	uint16_t u_ql2xiniexchg;
+	uint16_t qlini_mode;
+	uint16_t ql2xexchoffld;
+	uint16_t ql2xiniexchg;
+
 	struct name_list_extended gnl;
 	/* Count of active session/fcport */
 	int fcport_count;

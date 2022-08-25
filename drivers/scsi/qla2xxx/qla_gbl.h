@@ -158,6 +158,8 @@ extern int ql2xnvmeenable;
 extern int ql2xautodetectsfp;
 extern int ql2xenablemsix;
 extern int qla2xuseresexchforels;
+extern int ql2xexlogins;
+extern int ql2xdifbundlinginternalbuffers;
 
 extern int qla2x00_loop_reset(scsi_qla_host_t *);
 extern void qla2x00_abort_all_cmds(scsi_qla_host_t *, int);
@@ -283,7 +285,7 @@ extern int qla24xx_walk_and_build_sglist_no_difb(struct qla_hw_data *, srb_t *,
 extern int qla24xx_walk_and_build_sglist(struct qla_hw_data *, srb_t *,
 	uint32_t *, uint16_t, struct qla_tc_param *);
 extern int qla24xx_walk_and_build_prot_sglist(struct qla_hw_data *, srb_t *,
-	uint32_t *, uint16_t, struct qla_tc_param *);
+	uint32_t *, uint16_t, struct qla_tgt_cmd *);
 extern int qla24xx_get_one_block_sg(uint32_t, struct qla2_sgx *, uint32_t *);
 extern int qla24xx_configure_prot_mode(srb_t *, uint16_t *);
 extern int qla24xx_build_scsi_crc_2_iocbs(srb_t *,
@@ -677,6 +679,7 @@ void qla_scan_work_fn(struct work_struct *);
  */
 struct device_attribute;
 extern struct device_attribute *qla2x00_host_attrs[];
+extern struct device_attribute *qla2x00_host_attrs_dm[];
 struct fc_function_template;
 extern struct fc_function_template qla2xxx_transport_functions;
 extern struct fc_function_template qla2xxx_transport_vport_functions;
@@ -690,7 +693,7 @@ extern int qla2x00_echo_test(scsi_qla_host_t *,
 extern int qla24xx_update_all_fcp_prio(scsi_qla_host_t *);
 extern int qla24xx_fcp_prio_cfg_valid(scsi_qla_host_t *,
 	struct qla_fcp_prio_cfg *, uint8_t);
-
+void qla_insert_tgt_attrs(void);
 /*
  * Global Function Prototypes in qla_dfs.c source file.
  */
@@ -896,5 +899,7 @@ void qlt_unknown_atio_work_fn(struct work_struct *);
 void qlt_update_host_map(struct scsi_qla_host *, port_id_t);
 void qlt_remove_target_resources(struct qla_hw_data *);
 void qlt_clr_qp_table(struct scsi_qla_host *vha);
+void qlt_set_mode(struct scsi_qla_host *);
+int qla2x00_set_data_rate(scsi_qla_host_t *vha, uint16_t mode);
 
 #endif /* _QLA_GBL_H */

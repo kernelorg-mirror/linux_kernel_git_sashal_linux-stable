@@ -3577,6 +3577,11 @@ qla2x00_setup_chip(scsi_qla_host_t *vha)
 			if (rval == QLA_SUCCESS) {
 				qla24xx_detect_sfp(vha);
 
+				if ((IS_QLA83XX(ha) || IS_QLA27XX(ha)) &&
+				    (ha->zio_mode == QLA_ZIO_MODE_6))
+					qla27xx_set_zio_threshold(vha,
+					    ha->last_zio_threshold);
+
 				rval = qla2x00_set_exlogins_buffer(vha);
 				if (rval != QLA_SUCCESS)
 					goto failed;
@@ -3956,7 +3961,16 @@ qla24xx_config_rings(struct scsi_qla_host *vha)
 		WRT_REG_DWORD(&reg->isp24.rsp_q_in, 0);
 		WRT_REG_DWORD(&reg->isp24.rsp_q_out, 0);
 	}
+
 	qlt_24xx_config_rings(vha);
+
+	/* If the user has configured the speed, set it here */
+	if (ha->set_data_rate) {
+		ql_dbg(ql_dbg_init, vha, 0x00fd,
+		    "Speed set by user : %s Gbps \n",
+		    qla2x00_get_link_speed_str(ha, ha->set_data_rate));
+		icb->firmware_options_3 = (ha->set_data_rate << 13);
+	}
 
 	/* PCI posting */
 	RD_REG_DWORD(&ioreg->hccr);
@@ -4065,6 +4079,7 @@ next_check:
 		ql_dbg(ql_dbg_init, vha, 0x00d3,
 		    "Init Firmware -- success.\n");
 		QLA_FW_STARTED(ha);
+		vha->u_ql2xexchoffld = vha->u_ql2xiniexchg = 0;
 	}
 
 	return (rval);
@@ -6692,6 +6707,20 @@ qla2x00_abort_isp(scsi_qla_host_t *vha)
 			clear_bit(ISP_ABORT_RETRY, &vha->dpc_flags);
 			status = 0;
 			return status;
+		}
+
+		switch (vha->qlini_mode) {
+		case QLA2XXX_INI_MODE_DISABLED:
+			if (!qla_tgt_mode_enabled(vha))
+				return 0;
+			break;
+		case QLA2XXX_INI_MODE_DUAL:
+			if (!qla_dual_mode_enabled(vha))
+				return 0;
+			break;
+		case QLA2XXX_INI_MODE_ENABLED:
+		default:
+			break;
 		}
 
 		ha->isp_ops->get_flash_version(vha, req->ring);
