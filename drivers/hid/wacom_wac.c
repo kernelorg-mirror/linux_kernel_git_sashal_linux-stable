@@ -603,9 +603,26 @@ static int wacom_intuos_id_mangle(int tool_id)
 	return (tool_id & ~0xFFF) << 4 | (tool_id & 0xFFF);
 }
 
+static bool wacom_is_art_pen(int tool_id)
+{
+	bool is_art_pen = false;
+
+	switch (tool_id) {
+	case 0x885:	/* Intuos3 Marker Pen */
+	case 0x804:	/* Intuos4/5 13HD/24HD Marker Pen */
+	case 0x10804:	/* Intuos4/5 13HD/24HD Art Pen */
+		is_art_pen = true;
+		break;
+	}
+	return is_art_pen;
+}
+
 static int wacom_intuos_get_tool_type(int tool_id)
 {
-	int tool_type;
+	int tool_type = BTN_TOOL_PEN;
+
+	if (wacom_is_art_pen(tool_id))
+		return tool_type;
 
 	switch (tool_id) {
 	case 0x812: /* Inking pen */
@@ -620,12 +637,10 @@ static int wacom_intuos_get_tool_type(int tool_id)
 	case 0x852:
 	case 0x823: /* Intuos3 Grip Pen */
 	case 0x813: /* Intuos3 Classic Pen */
-	case 0x885: /* Intuos3 Marker Pen */
 	case 0x802: /* Intuos4/5 13HD/24HD General Pen */
-	case 0x804: /* Intuos4/5 13HD/24HD Marker Pen */
 	case 0x8e2: /* IntuosHT2 pen */
 	case 0x022:
-	case 0x10804: /* Intuos4/5 13HD/24HD Art Pen */
+	case 0x10842: /* MobileStudio Pro Pro Pen slim */
 	case 0x14802: /* Intuos4/5 13HD/24HD Classic Pen */
 	case 0x16802: /* Cintiq 13HD Pro Pen */
 	case 0x18802: /* DTH2242 Pen */
@@ -667,6 +682,7 @@ static int wacom_intuos_get_tool_type(int tool_id)
 	case 0x1480a: /* Intuos4/5 13HD/24HD Classic Pen Eraser */
 	case 0x1090a: /* Intuos4/5 13HD/24HD Airbrush Eraser */
 	case 0x1080c: /* Intuos4/5 13HD/24HD Art Pen Eraser */
+	case 0x1084a: /* MobileStudio Pro Pro Pen slim Eraser */
 	case 0x1680a: /* Cintiq 13HD Pro Pen Eraser */
 	case 0x1880a: /* DTH2242 Eraser */
 	case 0x1080a: /* Intuos4/5 13HD/24HD General Pen Eraser */
@@ -680,10 +696,6 @@ static int wacom_intuos_get_tool_type(int tool_id)
 	case 0x902: /* Intuos4/5 13HD/24HD Airbrush */
 	case 0x10902: /* Intuos4/5 13HD/24HD Airbrush */
 		tool_type = BTN_TOOL_AIRBRUSH;
-		break;
-
-	default: /* Unknown tool */
-		tool_type = BTN_TOOL_PEN;
 		break;
 	}
 	return tool_type;
@@ -2282,6 +2294,9 @@ static void wacom_wac_pen_event(struct hid_device *hdev, struct hid_field *field
 		}
 		return;
 	case HID_DG_TWIST:
+		/* don't modify the value if the pen doesn't support the feature */
+		if (!wacom_is_art_pen(wacom_wac->id[0])) return;
+
 		/*
 		 * Userspace expects pen twist to have its zero point when
 		 * the buttons/finger is on the tablet's left. HID values
