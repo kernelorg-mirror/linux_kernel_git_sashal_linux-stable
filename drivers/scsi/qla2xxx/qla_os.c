@@ -372,6 +372,7 @@ static void qla_init_base_qpair(struct scsi_qla_host *vha, struct req_que *req,
 	struct qla_hw_data *ha = vha->hw;
 	rsp->qpair = ha->base_qpair;
 	rsp->req = req;
+	ha->base_qpair->hw = ha;
 	ha->base_qpair->req = req;
 	ha->base_qpair->rsp = rsp;
 	ha->base_qpair->vha = vha;
@@ -1041,8 +1042,8 @@ qc24_fail_command:
  *    cmd = Scsi Command to wait on.
  *
  * Return:
- *    Not Found : 0
- *    Found : 1
+ *    Completed in time : QLA_SUCCESS
+ *    Did not complete in time : QLA_FUNCTION_FAILED
  */
 static int
 qla2x00_eh_wait_on_command(struct scsi_cmnd *cmd)
@@ -1326,6 +1327,9 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 	return ret;
 }
 
+/*
+ * Returns: QLA_SUCCESS or QLA_FUNCTION_FAILED.
+ */
 int
 qla2x00_eh_wait_for_pending_commands(scsi_qla_host_t *vha, unsigned int t,
 	uint64_t l, enum nexus_wait_type type)
@@ -1457,8 +1461,12 @@ qla2xxx_eh_device_reset(struct scsi_cmnd *cmd)
 static int
 qla2xxx_eh_target_reset(struct scsi_cmnd *cmd)
 {
-	scsi_qla_host_t *vha = shost_priv(cmd->device->host);
+	struct scsi_device *sdev = cmd->device;
+	struct fc_rport *rport = starget_to_rport(scsi_target(sdev));
+	scsi_qla_host_t *vha = shost_priv(rport_to_shost(rport));
 	struct qla_hw_data *ha = vha->hw;
+	fc_port_t *fcport = *(fc_port_t **)rport->dd_data;
+	int err;
 
 	if (qla2x00_isp_reg_stat(ha)) {
 		ql_log(ql_log_info, vha, 0x803f,
@@ -1466,8 +1474,54 @@ qla2xxx_eh_target_reset(struct scsi_cmnd *cmd)
 		return FAILED;
 	}
 
-	return __qla2xxx_eh_generic_reset("TARGET", WAIT_TARGET, cmd,
-	    ha->isp_ops->target_reset);
+	if (!fcport) {
+		return FAILED;
+	}
+
+	err = fc_block_rport(rport);
+	if (err != 0)
+		return err;
+
+	if (fcport->deleted)
+		return SUCCESS;
+
+	ql_log(ql_log_info, vha, 0x8009,
+	    "TARGET RESET ISSUED nexus=%ld:%d cmd=%p.\n", vha->host_no,
+	    sdev->id, cmd);
+
+	err = 0;
+	if (qla2x00_wait_for_hba_online(vha) != QLA_SUCCESS) {
+		ql_log(ql_log_warn, vha, 0x800a,
+		    "Wait for hba online failed for cmd=%p.\n", cmd);
+		goto eh_reset_failed;
+	}
+	err = 2;
+	if (ha->isp_ops->target_reset(fcport, 0, 0) != QLA_SUCCESS) {
+		ql_log(ql_log_warn, vha, 0x800c,
+		    "target_reset failed for cmd=%p.\n", cmd);
+		goto eh_reset_failed;
+	}
+	err = 3;
+	if (qla2x00_eh_wait_for_pending_commands(vha, sdev->id,
+	    0, WAIT_TARGET) != QLA_SUCCESS) {
+		ql_log(ql_log_warn, vha, 0x800d,
+		    "wait for pending cmds failed for cmd=%p.\n", cmd);
+		goto eh_reset_failed;
+	}
+
+	ql_log(ql_log_info, vha, 0x800e,
+	    "TARGET RESET SUCCEEDED nexus:%ld:%d cmd=%p.\n",
+	    vha->host_no, sdev->id, cmd);
+
+	return SUCCESS;
+
+eh_reset_failed:
+	ql_log(ql_log_info, vha, 0x800f,
+	    "TARGET RESET FAILED: %s nexus=%ld:%d:%llu cmd=%p.\n",
+	    reset_errors[err], vha->host_no, cmd->device->id, cmd->device->lun,
+	    cmd);
+	vha->reset_cmd_err_cnt++;
+	return FAILED;
 }
 
 /**************************************************************************
