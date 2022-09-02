@@ -908,6 +908,8 @@ void atomisp_buf_done(struct atomisp_sub_device *asd, int error,
 	struct v4l2_control ctrl;
 	bool reset_wdt_timer = false;
 
+	lockdep_assert_held(&isp->mutex);
+
 	if (
 	    buf_type != IA_CSS_BUFFER_TYPE_METADATA &&
 	    buf_type != IA_CSS_BUFFER_TYPE_3A_STATISTICS &&
@@ -1307,6 +1309,9 @@ static void __atomisp_css_recover(struct atomisp_device *isp, bool isp_timeout)
 	bool stream_restart[MAX_STREAM_NUM] = {0};
 	bool depth_mode = false;
 	int i, ret, depth_cnt = 0;
+	unsigned long flags;
+
+	lockdep_assert_held(&isp->mutex);
 
 	if (!isp->sw_contex.file_input)
 		atomisp_css_irq_enable(isp,
@@ -1331,7 +1336,9 @@ static void __atomisp_css_recover(struct atomisp_device *isp, bool isp_timeout)
 
 		stream_restart[asd->index] = true;
 
+		spin_lock_irqsave(&isp->lock, flags);
 		asd->streaming = ATOMISP_DEVICE_STREAMING_STOPPING;
+		spin_unlock_irqrestore(&isp->lock, flags);
 
 		/* stream off sensor */
 		ret = v4l2_subdev_call(
@@ -1346,7 +1353,9 @@ static void __atomisp_css_recover(struct atomisp_device *isp, bool isp_timeout)
 		css_pipe_id = atomisp_get_css_pipe_id(asd);
 		atomisp_css_stop(asd, css_pipe_id, true);
 
+		spin_lock_irqsave(&isp->lock, flags);
 		asd->streaming = ATOMISP_DEVICE_STREAMING_DISABLED;
+		spin_unlock_irqrestore(&isp->lock, flags);
 
 		asd->preview_exp_id = 1;
 		asd->postview_exp_id = 1;
@@ -1387,11 +1396,14 @@ static void __atomisp_css_recover(struct atomisp_device *isp, bool isp_timeout)
 						   IA_CSS_INPUT_MODE_BUFFERED_SENSOR);
 
 		css_pipe_id = atomisp_get_css_pipe_id(asd);
-		if (atomisp_css_start(asd, css_pipe_id, true))
+		if (atomisp_css_start(asd, css_pipe_id, true)) {
 			dev_warn(isp->dev,
 				 "start SP failed, so do not set streaming to be enable!\n");
-		else
+		} else {
+			spin_lock_irqsave(&isp->lock, flags);
 			asd->streaming = ATOMISP_DEVICE_STREAMING_ENABLED;
+			spin_unlock_irqrestore(&isp->lock, flags);
+		}
 
 		atomisp_csi2_configure(asd);
 	}
@@ -1626,6 +1638,8 @@ void atomisp_wdt_work(struct work_struct *work)
 void atomisp_css_flush(struct atomisp_device *isp)
 {
 	int i;
+
+	lockdep_assert_held(&isp->mutex);
 
 	if (!atomisp_streaming_count(isp))
 		return;
@@ -4077,6 +4091,8 @@ void atomisp_handle_parameter_and_buffer(struct atomisp_video_pipe *pipe)
 	unsigned long irqflags;
 	bool need_to_enqueue_buffer = false;
 
+	lockdep_assert_held(&asd->isp->mutex);
+
 	if (!asd) {
 		dev_err(pipe->isp->dev, "%s(): asd is NULL, device is %s\n",
 			__func__, pipe->vdev.name);
@@ -4169,6 +4185,8 @@ int atomisp_set_parameters(struct video_device *vdev,
 	struct atomisp_css_params_with_list *param = NULL;
 	struct atomisp_css_params *css_param = &asd->params.css_param;
 	int ret;
+
+	lockdep_assert_held(&asd->isp->mutex);
 
 	if (!asd) {
 		dev_err(pipe->isp->dev, "%s(): asd is NULL, device is %s\n",
@@ -5604,6 +5622,8 @@ int atomisp_set_fmt(struct video_device *vdev, struct v4l2_format *f)
 	struct v4l2_subdev_fh fh;
 	int ret;
 
+	lockdep_assert_held(&isp->mutex);
+
 	if (!asd) {
 		dev_err(isp->dev, "%s(): asd is NULL, device is %s\n",
 			__func__, vdev->name);
@@ -6275,6 +6295,8 @@ int atomisp_offline_capture_configure(struct atomisp_sub_device *asd,
 {
 	struct v4l2_ctrl *c;
 
+	lockdep_assert_held(&asd->isp->mutex);
+
 	/*
 	* In case of M10MO ZSL capture case, we need to issue a separate
 	* capture request to M10MO which will output captured jpeg image
@@ -6549,6 +6571,8 @@ int atomisp_exp_id_capture(struct atomisp_sub_device *asd, int *exp_id)
 	int value = *exp_id;
 	int ret;
 
+	lockdep_assert_held(&isp->mutex);
+
 	ret = __is_raw_buffer_locked(asd, value);
 	if (ret) {
 		dev_err(isp->dev, "%s exp_id %d invalid %d.\n", __func__, value, ret);
@@ -6569,6 +6593,8 @@ int atomisp_exp_id_unlock(struct atomisp_sub_device *asd, int *exp_id)
 	struct atomisp_device *isp = asd->isp;
 	int value = *exp_id;
 	int ret;
+
+	lockdep_assert_held(&isp->mutex);
 
 	ret = __clear_raw_buffer_bitmap(asd, value);
 	if (ret) {
@@ -6604,6 +6630,8 @@ int atomisp_inject_a_fake_event(struct atomisp_sub_device *asd, int *event)
 {
 	if (!event || asd->streaming != ATOMISP_DEVICE_STREAMING_ENABLED)
 		return -EINVAL;
+
+	lockdep_assert_held(&asd->isp->mutex);
 
 	dev_dbg(asd->isp->dev, "%s: trying to inject a fake event 0x%x\n",
 		__func__, *event);
