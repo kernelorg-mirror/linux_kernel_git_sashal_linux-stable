@@ -22,6 +22,9 @@ struct errata_info {
 
 static bool errata_mt_check_func(unsigned long  arch_id, unsigned long impid)
 {
+	if (!IS_ENABLED(CONFIG_ERRATA_THEAD_PBMT))
+		return false;
+
 	if (arch_id != 0 || impid != 0)
 		return false;
 	return true;
