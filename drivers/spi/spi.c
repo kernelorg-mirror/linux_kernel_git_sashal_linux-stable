@@ -1052,6 +1052,8 @@ static void spi_unmap_buf_attrs(struct spi_controller *ctlr,
 	if (sgt->orig_nents) {
 		dma_unmap_sgtable(dev, sgt, dir, attrs);
 		sg_free_table(sgt);
+		sgt->orig_nents = 0;
+		sgt->nents = 0;
 	}
 }
 
