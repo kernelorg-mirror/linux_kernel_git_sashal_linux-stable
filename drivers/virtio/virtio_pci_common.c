@@ -389,6 +389,9 @@ int vp_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 				 true, false);
 	if (!err)
 		return 0;
+	/* Is there an interrupt pin? If not give up. */
+	if (!(to_vp_device(vdev)->pci_dev->pin))
+		return err;
 	/* Finally fall back to regular interrupts. */
 	return vp_try_to_find_vqs(vdev, nvqs, vqs, callbacks, names,
 				  false, false);
