@@ -1647,7 +1647,9 @@ static void iio_dev_release(struct device *device)
 
 	iio_device_detach_buffers(indio_dev);
 
-	ida_simple_remove(&iio_ida, iio_dev_opaque->id);
+	lockdep_unregister_key(&iio_dev_opaque->mlock_key);
+
+	ida_free(&iio_ida, iio_dev_opaque->id);
 	kfree(iio_dev_opaque);
 }
 
@@ -1689,7 +1691,7 @@ struct iio_dev *iio_device_alloc(struct device *parent, int sizeof_priv)
 	mutex_init(&iio_dev_opaque->info_exist_lock);
 	INIT_LIST_HEAD(&iio_dev_opaque->channel_attr_list);
 
-	iio_dev_opaque->id = ida_simple_get(&iio_ida, 0, 0, GFP_KERNEL);
+	iio_dev_opaque->id = ida_alloc(&iio_ida, GFP_KERNEL);
 	if (iio_dev_opaque->id < 0) {
 		/* cannot use a dev_err as the name isn't available */
 		pr_err("failed to get device id\n");
@@ -1698,13 +1700,16 @@ struct iio_dev *iio_device_alloc(struct device *parent, int sizeof_priv)
 	}
 
 	if (dev_set_name(&indio_dev->dev, "iio:device%d", iio_dev_opaque->id)) {
-		ida_simple_remove(&iio_ida, iio_dev_opaque->id);
+		ida_free(&iio_ida, iio_dev_opaque->id);
 		kfree(iio_dev_opaque);
 		return NULL;
 	}
 
 	INIT_LIST_HEAD(&iio_dev_opaque->buffer_list);
 	INIT_LIST_HEAD(&iio_dev_opaque->ioctl_handlers);
+
+	lockdep_register_key(&iio_dev_opaque->mlock_key);
+	lockdep_set_class(&indio_dev->mlock, &iio_dev_opaque->mlock_key);
 
 	return indio_dev;
 }
