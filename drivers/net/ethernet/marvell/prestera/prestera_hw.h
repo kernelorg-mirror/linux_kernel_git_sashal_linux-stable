@@ -123,9 +123,10 @@ enum prestera_hw_vtcam_direction_t {
 };
 
 enum {
-	PRESTERA_HW_COUNTER_CLIENT_LOOKUP_0 = 0,
-	PRESTERA_HW_COUNTER_CLIENT_LOOKUP_1 = 1,
-	PRESTERA_HW_COUNTER_CLIENT_LOOKUP_2 = 2,
+	PRESTERA_HW_COUNTER_CLIENT_INGRESS_LOOKUP_0 = 0,
+	PRESTERA_HW_COUNTER_CLIENT_INGRESS_LOOKUP_1 = 1,
+	PRESTERA_HW_COUNTER_CLIENT_INGRESS_LOOKUP_2 = 2,
+	PRESTERA_HW_COUNTER_CLIENT_EGRESS_LOOKUP = 3,
 };
 
 struct prestera_switch;
@@ -240,8 +241,9 @@ int prestera_hw_counter_clear(struct prestera_switch *sw, u32 block_id,
 
 /* SPAN API */
 int prestera_hw_span_get(const struct prestera_port *port, u8 *span_id);
-int prestera_hw_span_bind(const struct prestera_port *port, u8 span_id);
-int prestera_hw_span_unbind(const struct prestera_port *port);
+int prestera_hw_span_bind(const struct prestera_port *port, u8 span_id,
+			  bool ingress);
+int prestera_hw_span_unbind(const struct prestera_port *port, bool ingress);
 int prestera_hw_span_release(struct prestera_switch *sw, u8 span_id);
 
 /* Router API */
