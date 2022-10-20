@@ -71,6 +71,7 @@
 #include "util/bpf_counter.h"
 #include "util/iostat.h"
 #include "util/pmu-hybrid.h"
+ #include "util/topdown.h"
 #include "asm/bug.h"
 
 #include <linux/time64.h>
@@ -1257,6 +1258,8 @@ static struct option stat_options[] = {
 		    "Merge identical named hybrid events"),
 	OPT_STRING('x', "field-separator", &stat_config.csv_sep, "separator",
 		   "print counts with custom separator"),
+	OPT_BOOLEAN('j', "json-output", &stat_config.json_output,
+		   "print counts in JSON format"),
 	OPT_CALLBACK('G', "cgroup", &evsel_list, "name",
 		     "monitor event in cgroup name only", parse_stat_cgroups),
 	OPT_STRING(0, "for-each-cgroup", &stat_config.cgroup_list, "name",
@@ -1443,6 +1446,7 @@ static aggr_cpu_id_get_t aggr_mode__get_aggr(enum aggr_mode aggr_mode)
 	case AGGR_GLOBAL:
 	case AGGR_THREAD:
 	case AGGR_UNSET:
+	case AGGR_MAX:
 	default:
 		return NULL;
 	}
@@ -1467,6 +1471,7 @@ static aggr_get_id_t aggr_mode__get_id(enum aggr_mode aggr_mode)
 	case AGGR_GLOBAL:
 	case AGGR_THREAD:
 	case AGGR_UNSET:
+	case AGGR_MAX:
 	default:
 		return NULL;
 	}
@@ -1617,6 +1622,7 @@ static aggr_cpu_id_get_t aggr_mode__get_aggr_file(enum aggr_mode aggr_mode)
 	case AGGR_GLOBAL:
 	case AGGR_THREAD:
 	case AGGR_UNSET:
+	case AGGR_MAX:
 	default:
 		return NULL;
 	}
@@ -1637,6 +1643,7 @@ static aggr_get_id_t aggr_mode__get_id_file(enum aggr_mode aggr_mode)
 	case AGGR_GLOBAL:
 	case AGGR_THREAD:
 	case AGGR_UNSET:
+	case AGGR_MAX:
 	default:
 		return NULL;
 	}
@@ -1859,21 +1866,10 @@ static int add_default_attributes(void)
 		unsigned int max_level = 1;
 		char *str = NULL;
 		bool warn = false;
-		const char *pmu_name = "cpu";
+		const char *pmu_name = arch_get_topdown_pmu_name(evsel_list, true);
 
 		if (!force_metric_only)
 			stat_config.metric_only = true;
-
-		if (perf_pmu__has_hybrid()) {
-			if (!evsel_list->hybrid_pmu_name) {
-				pr_warning("WARNING: default to use cpu_core topdown events\n");
-				evsel_list->hybrid_pmu_name = perf_pmu__hybrid_type_to_pmu("core");
-			}
-
-			pmu_name = evsel_list->hybrid_pmu_name;
-			if (!pmu_name)
-				return -1;
-		}
 
 		if (pmu_have_event(pmu_name, topdown_metric_L2_attrs[5])) {
 			metric_attrs = topdown_metric_L2_attrs;
