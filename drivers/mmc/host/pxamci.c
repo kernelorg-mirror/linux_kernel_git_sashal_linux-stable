@@ -816,7 +816,12 @@ static int pxamci_probe(struct platform_device *pdev)
 	if (gpio_is_valid(gpio_ro) && host->pdata->get_ro)
 		dev_warn(&pdev->dev, "gpio_ro and get_ro() both defined\n");
 
-	mmc_add_host(mmc);
+	ret = mmc_add_host(mmc);
+	if (ret) {
+		if (host->pdata && host->pdata->exit)
+			host->pdata->exit(dev, mmc);
+		goto out;
+	}
 
 	return 0;
 
