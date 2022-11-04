@@ -796,7 +796,6 @@ struct eth_dev *gether_setup_name(struct usb_gadget *g,
 	net->ethtool_ops = &ops;
 
 	dev->gadget = g;
-	SET_NETDEV_DEV(net, &g->dev);
 	SET_NETDEV_DEVTYPE(net, &gadget_type);
 
 	status = register_netdev(net);
@@ -864,8 +863,6 @@ int gether_register_netdev(struct net_device *net)
 	struct sockaddr sa;
 	int status;
 
-	if (!net->dev.parent)
-		return -EINVAL;
 	dev = netdev_priv(net);
 	g = dev->gadget;
 	status = register_netdev(net);
@@ -901,7 +898,6 @@ void gether_set_gadget(struct net_device *net, struct usb_gadget *g)
 
 	dev = netdev_priv(net);
 	dev->gadget = g;
-	SET_NETDEV_DEV(net, &g->dev);
 }
 EXPORT_SYMBOL_GPL(gether_set_gadget);
 
