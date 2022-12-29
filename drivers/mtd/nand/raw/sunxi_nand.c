@@ -1927,6 +1927,25 @@ static const struct nand_controller_ops sunxi_nand_controller_ops = {
 	.exec_op = sunxi_nfc_exec_op,
 };
 
+static void sunxi_nand_chips_cleanup(struct sunxi_nfc *nfc)
+{
+	struct sunxi_nand_chip *sunxi_nand;
+	struct nand_chip *chip;
+	int ret;
+
+	while (!list_empty(&nfc->chips)) {
+		sunxi_nand = list_first_entry(&nfc->chips,
+					      struct sunxi_nand_chip,
+					      node);
+		chip = &sunxi_nand->nand;
+		ret = mtd_device_unregister(nand_to_mtd(chip));
+		WARN_ON(ret);
+		nand_cleanup(chip);
+		sunxi_nand_ecc_cleanup(sunxi_nand);
+		list_del(&sunxi_nand->node);
+	}
+}
+
 static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 				struct device_node *np)
 {
@@ -2032,6 +2051,7 @@ static int sunxi_nand_chips_init(struct device *dev, struct sunxi_nfc *nfc)
 		ret = sunxi_nand_chip_init(dev, nfc, nand_np);
 		if (ret) {
 			of_node_put(nand_np);
+			sunxi_nand_chips_cleanup(nfc);
 			return ret;
 		}
 	}
@@ -2056,6 +2076,36 @@ static void sunxi_nand_chips_cleanup(struct sunxi_nfc *nfc)
 		sunxi_nand_ecc_cleanup(&chip->ecc);
 		list_del(&sunxi_nand->node);
 	}
+}
+
+static int sunxi_nfc_dma_init(struct sunxi_nfc *nfc, struct resource *r)
+{
+	int ret;
+
+	if (nfc->caps->has_mdma)
+		return 0;
+
+	nfc->dmac = dma_request_chan(nfc->dev, "rxtx");
+	if (IS_ERR(nfc->dmac)) {
+		ret = PTR_ERR(nfc->dmac);
+		if (ret == -EPROBE_DEFER)
+			return ret;
+
+		/* Ignore errors to fall back to PIO mode */
+		dev_warn(nfc->dev, "failed to request rxtx DMA channel: %d\n", ret);
+		nfc->dmac = NULL;
+	} else {
+		struct dma_slave_config dmac_cfg = { };
+
+		dmac_cfg.src_addr = r->start + nfc->caps->reg_io_data;
+		dmac_cfg.dst_addr = dmac_cfg.src_addr;
+		dmac_cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+		dmac_cfg.dst_addr_width = dmac_cfg.src_addr_width;
+		dmac_cfg.src_maxburst = nfc->caps->dma_maxburst;
+		dmac_cfg.dst_maxburst = nfc->caps->dma_maxburst;
+		dmaengine_slave_config(nfc->dmac, &dmac_cfg);
+	}
+	return 0;
 }
 
 static int sunxi_nfc_probe(struct platform_device *pdev)
