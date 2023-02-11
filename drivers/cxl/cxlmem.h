@@ -36,6 +36,7 @@
  * @cxlds: The device state backing this device
  * @detach_work: active memdev lost a port in its ancestry
  * @id: id number of this memdev instance.
+ * @depth: endpoint port depth
  */
 struct cxl_memdev {
 	struct device dev;
@@ -43,6 +44,7 @@ struct cxl_memdev {
 	struct cxl_dev_state *cxlds;
 	struct work_struct detach_work;
 	int id;
+	int depth;
 };
 
 static inline struct cxl_memdev *to_cxl_memdev(struct device *dev)
