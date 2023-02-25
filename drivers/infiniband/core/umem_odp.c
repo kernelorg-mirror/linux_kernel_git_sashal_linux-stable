@@ -495,9 +495,8 @@ EXPORT_SYMBOL(ib_umem_odp_release);
  * The function returns -EFAULT if the DMA mapping operation fails. It returns
  * -EAGAIN if a concurrent invalidation prevents us from updating the page.
  *
- * The page is released via put_user_page even if the operation failed. For
- * on-demand pinning, the page is released whenever it isn't stored in the
- * umem.
+ * The page is released via put_page even if the operation failed. For on-demand
+ * pinning, the page is released whenever it isn't stored in the umem.
  */
 static int ib_umem_odp_map_dma_single_page(
 		struct ib_umem_odp *umem_odp,
@@ -508,7 +507,6 @@ static int ib_umem_odp_map_dma_single_page(
 {
 	struct ib_device *dev = umem_odp->umem.ibdev;
 	dma_addr_t dma_addr;
-	int remove_existing_mapping = 0;
 	int ret = 0;
 
 	/*
@@ -534,28 +532,29 @@ static int ib_umem_odp_map_dma_single_page(
 	} else if (umem_odp->page_list[page_index] == page) {
 		umem_odp->dma_list[page_index] |= access_mask;
 	} else {
-		pr_err("error: got different pages in IB device and from get_user_pages. IB device page: %p, gup page: %p\n",
-		       umem_odp->page_list[page_index], page);
-		/* Better remove the mapping now, to prevent any further
-		 * damage. */
-		remove_existing_mapping = 1;
-	}
-
-out:
-	put_user_page(page);
-
-	if (remove_existing_mapping) {
-		ib_umem_notifier_start_account(umem_odp);
-		dev->ops.invalidate_range(
-			umem_odp,
-			ib_umem_start(umem_odp) +
-				(page_index << umem_odp->page_shift),
-			ib_umem_start(umem_odp) +
-				((page_index + 1) << umem_odp->page_shift));
-		ib_umem_notifier_end_account(umem_odp);
+		/*
+		 * This is a race here where we could have done:
+		 *
+		 *         CPU0                             CPU1
+		 *   get_user_pages()
+		 *                                       invalidate()
+		 *                                       page_fault()
+		 *   mutex_lock(umem_mutex)
+		 *    page from GUP != page in ODP
+		 *
+		 * It should be prevented by the retry test above as reading
+		 * the seq number should be reliable under the
+		 * umem_mutex. Thus something is really not working right if
+		 * things get here.
+		 */
+		WARN(true,
+		     "Got different pages in IB device and from get_user_pages. IB device page: %p, gup page: %p\n",
+		     umem_odp->page_list[page_index], page);
 		ret = -EAGAIN;
 	}
 
+out:
+	put_page(page);
 	return ret;
 }
 
@@ -665,7 +664,7 @@ int ib_umem_odp_map_dma_pages(struct ib_umem_odp *umem_odp, u64 user_virt,
 					ret = -EFAULT;
 					break;
 				}
-				put_user_page(local_page_list[j]);
+				put_page(local_page_list[j]);
 				continue;
 			}
 
@@ -692,8 +691,8 @@ int ib_umem_odp_map_dma_pages(struct ib_umem_odp *umem_odp, u64 user_virt,
 			 * ib_umem_odp_map_dma_single_page().
 			 */
 			if (npages - (j + 1) > 0)
-				put_user_pages(&local_page_list[j+1],
-					       npages - (j + 1));
+				release_pages(&local_page_list[j+1],
+					      npages - (j + 1));
 			break;
 		}
 	}
