@@ -419,7 +419,9 @@ int crypto_unregister_alg(struct crypto_alg *alg)
 	if (ret)
 		return ret;
 
-	BUG_ON(refcount_read(&alg->cra_refcnt) != 1);
+	if (WARN_ON(refcount_read(&alg->cra_refcnt) != 1))
+		return;
+
 	if (alg->cra_destroy)
 		alg->cra_destroy(alg);
 
