@@ -2772,6 +2772,7 @@ struct rtw89_chip_info {
 	const struct rtw89_imr_info *imr_info;
 	const struct rtw89_rrsr_cfgs *rrsr_cfgs;
 	u32 dma_ch_mask;
+	u32 edcca_lvl_reg;
 	const struct wiphy_wowlan_support *wowlan_stub;
 };
 
@@ -2979,6 +2980,8 @@ struct rtw89_hal {
 
 	bool entity_active;
 	enum rtw89_entity_mode entity_mode;
+
+	u32 edcca_bak;
 };
 
 #define RTW89_MAX_MAC_ID_NUM 128
