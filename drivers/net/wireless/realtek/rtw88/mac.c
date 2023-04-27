@@ -530,6 +530,25 @@ static int iddma_download_firmware(struct rtw_dev *rtwdev, u32 src, u32 dst,
 	return 0;
 }
 
+int rtw_ddma_to_fw_fifo(struct rtw_dev *rtwdev, u32 ocp_src, u32 size)
+{
+	u32 ch0_ctrl = BIT_DDMACH0_OWN | BIT_DDMACH0_DDMA_MODE;
+
+	if (!check_hw_ready(rtwdev, REG_DDMA_CH0CTRL, BIT_DDMACH0_OWN, 0)) {
+		rtw_dbg(rtwdev, RTW_DBG_FW, "busy to start ddma\n");
+		return -EBUSY;
+	}
+
+	ch0_ctrl |= size & BIT_MASK_DDMACH0_DLEN;
+
+	if (iddma_enable(rtwdev, ocp_src, OCPBASE_RXBUF_FW_88XX, ch0_ctrl)) {
+		rtw_dbg(rtwdev, RTW_DBG_FW, "busy to complete ddma\n");
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
 static bool
 check_fw_checksum(struct rtw_dev *rtwdev, u32 addr)
 {
@@ -1012,6 +1031,9 @@ static int txdma_queue_mapping(struct rtw_dev *rtwdev)
 	rtw_write8(rtwdev, REG_CR, MAC_TRX_ENABLE);
 	if (rtw_chip_wcpu_11ac(rtwdev))
 		rtw_write32(rtwdev, REG_H2CQ_CSR, BIT_H2CQ_FULL);
+
+	if (rtw_hci_type(rtwdev) == RTW_HCI_TYPE_USB)
+		rtw_write8_set(rtwdev, REG_TXDMA_PQ_MAP, BIT_RXDMA_ARBBW_EN);
 
 	return 0;
 }

@@ -181,6 +181,7 @@
 #define BIT_TXDMA_VIQ_MAP(x)                                                   \
 	(((x) & BIT_MASK_TXDMA_VIQ_MAP) << BIT_SHIFT_TXDMA_VIQ_MAP)
 #define REG_TXDMA_PQ_MAP	0x010C
+#define BIT_RXDMA_ARBBW_EN	BIT(0)
 #define BIT_SHIFT_TXDMA_BEQ_MAP	8
 #define BIT_MASK_TXDMA_BEQ_MAP	0x3
 #define BIT_TXDMA_BEQ_MAP(x)                                                   \
@@ -306,6 +307,8 @@
 #define REG_DARFRC		0x0430
 #define REG_DARFRCH		0x0434
 #define REG_RARFRCH		0x043C
+#define REG_RRSR		0x0440
+#define BITS_RRSR_RSC		GENMASK(22, 21)
 #define REG_ARFR0		0x0444
 #define REG_ARFRH0		0x0448
 #define REG_ARFR1_V1		0x044C
@@ -507,6 +510,7 @@
 #define BIT_RFE_BUF_EN		BIT(3)
 
 #define REG_ANAPAR_XTAL_0	0x1040
+#define BIT_XCAP_0		GENMASK(23, 10)
 #define REG_CPU_DMEM_CON	0x1080
 #define BIT_WL_PLATFORM_RST	BIT(16)
 #define BIT_WL_SECURITY_CLK	BIT(15)
@@ -525,6 +529,7 @@
 #define BIT_DDMACH0_OWN		BIT(31)
 #define BIT_DDMACH0_CHKSUM_EN	BIT(29)
 #define BIT_DDMACH0_CHKSUM_STS	BIT(27)
+#define BIT_DDMACH0_DDMA_MODE	BIT(26)
 #define BIT_DDMACH0_RESET_CHKSUM_STS BIT(25)
 #define BIT_DDMACH0_CHKSUM_CONT	BIT(24)
 #define BIT_MASK_DDMACH0_DLEN	0x3ffff
