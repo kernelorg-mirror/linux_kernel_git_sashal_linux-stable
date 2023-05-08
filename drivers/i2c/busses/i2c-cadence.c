@@ -1359,7 +1359,7 @@ err_clk_dis:
  *
  * Return: 0 always
  */
-static int cdns_i2c_remove(struct platform_device *pdev)
+static void cdns_i2c_remove(struct platform_device *pdev)
 {
 	struct cdns_i2c *id = platform_get_drvdata(pdev);
 
@@ -1370,8 +1370,6 @@ static int cdns_i2c_remove(struct platform_device *pdev)
 	i2c_del_adapter(&id->adap);
 	clk_notifier_unregister(id->clk, &id->clk_rate_change_nb);
 	clk_disable_unprepare(id->clk);
-
-	return 0;
 }
 
 static struct platform_driver cdns_i2c_drv = {
@@ -1381,7 +1379,7 @@ static struct platform_driver cdns_i2c_drv = {
 		.pm = &cdns_i2c_dev_pm_ops,
 	},
 	.probe  = cdns_i2c_probe,
-	.remove = cdns_i2c_remove,
+	.remove_new = cdns_i2c_remove,
 };
 
 module_platform_driver(cdns_i2c_drv);
