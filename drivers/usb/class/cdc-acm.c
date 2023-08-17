@@ -318,6 +318,16 @@ static void acm_process_notification(struct acm *acm, unsigned char *buf)
 		}
 
 		difference = acm->ctrlin ^ newctrl;
+
+		if ((difference & USB_CDC_SERIAL_STATE_DCD) && acm->port.tty) {
+			struct tty_ldisc *ld = tty_ldisc_ref(acm->port.tty);
+			if (ld) {
+				if (ld->ops->dcd_change)
+					ld->ops->dcd_change(acm->port.tty, newctrl & USB_CDC_SERIAL_STATE_DCD);
+				tty_ldisc_deref(ld);
+			}
+		}
+
 		spin_lock_irqsave(&acm->read_lock, flags);
 		acm->ctrlin = newctrl;
 		acm->oldcount = acm->iocount;
