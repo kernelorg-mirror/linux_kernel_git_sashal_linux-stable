@@ -634,8 +634,8 @@ static inline bool io_recv_finish(struct io_kiocb *req, int *ret,
 	}
 
 	if (!mshot_finished) {
-		if (io_aux_cqe(req->ctx, issue_flags & IO_URING_F_COMPLETE_DEFER,
-			       req->cqe.user_data, *ret, cflags | IORING_CQE_F_MORE, true)) {
+		if (io_aux_cqe(req, issue_flags & IO_URING_F_COMPLETE_DEFER,
+			       *ret, cflags | IORING_CQE_F_MORE, false)) {
 			io_recv_prep_retry(req);
 			return false;
 		}
@@ -1308,7 +1308,6 @@ int io_accept_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 
 int io_accept(struct io_kiocb *req, unsigned int issue_flags)
 {
-	struct io_ring_ctx *ctx = req->ctx;
 	struct io_accept *accept = io_kiocb_to_cmd(req, struct io_accept);
 	bool force_nonblock = issue_flags & IO_URING_F_NONBLOCK;
 	unsigned int file_flags = force_nonblock ? O_NONBLOCK : 0;
@@ -1358,8 +1357,8 @@ retry:
 
 	if (ret < 0)
 		return ret;
-	if (io_aux_cqe(ctx, issue_flags & IO_URING_F_COMPLETE_DEFER,
-		       req->cqe.user_data, ret, IORING_CQE_F_MORE, true))
+	if (io_aux_cqe(req, issue_flags & IO_URING_F_COMPLETE_DEFER, ret,
+		       IORING_CQE_F_MORE, true))
 		goto retry;
 
 	return -ECANCELED;
