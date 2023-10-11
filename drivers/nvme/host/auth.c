@@ -758,6 +758,7 @@ static void nvme_queue_auth_work(struct work_struct *work)
 	dev_dbg(ctrl->device, "%s: qid %d host response\n",
 		__func__, chap->qid);
 	ret = nvme_auth_dhchap_setup_host_response(ctrl, chap);
+	mutex_unlock(&ctrl->dhchap_auth_mutex);
 	if (ret) {
 		chap->error = ret;
 		goto fail2;
