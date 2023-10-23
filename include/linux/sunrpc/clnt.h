@@ -74,6 +74,7 @@ struct rpc_clnt {
 	struct rpc_xprt_iter	cl_xpi;
 	const struct cred	*cl_cred;
 	unsigned int		cl_max_connect; /* max number of transports not to the same IP */
+	struct super_block *pipefs_sb;
 };
 
 /*
