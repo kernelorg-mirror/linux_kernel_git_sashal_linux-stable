@@ -1116,6 +1116,14 @@ static int intel_dp_mst_add_properties(struct intel_dp *intel_dp,
 {
 	struct drm_i915_private *i915 = to_i915(connector->dev);
 
+	/*
+	 * TODO: set the AUX for the actual MST port decompressing the stream.
+	 * At the moment the driver only supports enabling this globally in the
+	 * first downstream MST branch, via intel_dp's (root port) AUX.
+	 */
+	intel_connector->dp.dsc_decompression_aux = &intel_dp->aux;
+	intel_dp_mst_read_decompression_port_dsc_caps(intel_dp, intel_connector);
+
 	drm_object_attach_property(&connector->base,
 				   i915->drm.mode_config.path_property, 0);
 	drm_object_attach_property(&connector->base,
@@ -1172,14 +1180,6 @@ static struct drm_connector *intel_dp_add_mst_connector(struct drm_dp_mst_topolo
 	intel_connector->mst_port = intel_dp;
 	intel_connector->port = port;
 	drm_dp_mst_get_port_malloc(port);
-
-	/*
-	 * TODO: set the AUX for the actual MST port decompressing the stream.
-	 * At the moment the driver only supports enabling this globally in the
-	 * first downstream MST branch, via intel_dp's (root port) AUX.
-	 */
-	intel_connector->dp.dsc_decompression_aux = &intel_dp->aux;
-	intel_dp_mst_read_decompression_port_dsc_caps(intel_dp, intel_connector);
 
 	connector = &intel_connector->base;
 	ret = drm_connector_init(dev, connector, &intel_dp_mst_connector_funcs,
