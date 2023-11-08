@@ -306,7 +306,7 @@ static int __init meson_sm_probe(struct platform_device *pdev)
 		fw->sm_shmem_out_base = meson_sm_map_shmem(chip->cmd_shmem_out_base,
 							   chip->shmem_size);
 		if (WARN_ON(!fw->sm_shmem_out_base))
-			goto out_in_base;
+			goto unmap_in_base;
 	}
 
 	fw->chip = chip;
@@ -314,7 +314,7 @@ static int __init meson_sm_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, fw);
 
 	if (devm_of_platform_populate(dev))
-		goto out_in_base;
+		goto unmap_out_base;
 
 	if (sysfs_create_group(&pdev->dev.kobj, &meson_sm_sysfs_attr_group))
 		goto out_in_base;
@@ -323,7 +323,9 @@ static int __init meson_sm_probe(struct platform_device *pdev)
 
 	return 0;
 
-out_in_base:
+unmap_out_base:
+	iounmap(fw->sm_shmem_out_base);
+unmap_in_base:
 	iounmap(fw->sm_shmem_in_base);
 out:
 	return -EINVAL;
