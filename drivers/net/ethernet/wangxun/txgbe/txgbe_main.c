@@ -92,6 +92,7 @@ static int txgbe_probe(struct pci_dev *pdev,
 
 	pci_enable_pcie_error_reporting(pdev);
 	pci_set_master(pdev);
+	netdev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
 
 	netdev = devm_alloc_etherdev_mqs(&pdev->dev,
 					 sizeof(struct txgbe_adapter),
