@@ -535,6 +535,7 @@ out_del_integrity:
 	blk_integrity_del(disk);
 out_del_block_link:
 	sysfs_remove_link(block_depr, dev_name(ddev));
+	pm_runtime_set_memalloc_noio(ddev, false);
 out_device_del:
 	device_del(ddev);
 out_free_ext_minor:
