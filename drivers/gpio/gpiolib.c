@@ -198,7 +198,7 @@ struct gpio_chip *gpiod_to_chip(const struct gpio_desc *desc)
 EXPORT_SYMBOL_GPL(gpiod_to_chip);
 
 /* dynamic allocation of GPIOs, e.g. on a hotplugged device */
-static int gpiochip_find_base(int ngpio)
+static int gpiochip_find_base_unlocked(int ngpio)
 {
 	struct gpio_device *gdev;
 	int base = GPIO_DYNAMIC_BASE;
@@ -271,7 +271,7 @@ EXPORT_SYMBOL_GPL(gpiod_get_direction);
  * Return -EBUSY if the new chip overlaps with some other chip's integer
  * space.
  */
-static int gpiodev_add_to_list(struct gpio_device *gdev)
+static int gpiodev_add_to_list_unlocked(struct gpio_device *gdev)
 {
 	struct gpio_device *prev, *next;
 
@@ -815,7 +815,7 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 	 */
 	base = gc->base;
 	if (base < 0) {
-		base = gpiochip_find_base(gc->ngpio);
+		base = gpiochip_find_base_unlocked(gc->ngpio);
 		if (base < 0) {
 			spin_unlock_irqrestore(&gpio_lock, flags);
 			ret = base;
@@ -835,7 +835,7 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 	}
 	gdev->base = base;
 
-	ret = gpiodev_add_to_list(gdev);
+	ret = gpiodev_add_to_list_unlocked(gdev);
 	if (ret) {
 		spin_unlock_irqrestore(&gpio_lock, flags);
 		chip_err(gc, "GPIO integer space overlap, cannot add chip\n");
