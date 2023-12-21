@@ -3514,6 +3514,8 @@ bpf_object__collect_prog_relos(struct bpf_object *obj, GElf_Shdr *shdr, Elf_Data
 	__u32 insn_idx;
 	GElf_Sym sym;
 	GElf_Rel rel;
+	if (!scn_data)
+		return -LIBBPF_ERRNO__FORMAT;
 
 	relo_sec_name = elf_sec_str(obj, shdr->sh_name);
 	sec_name = elf_sec_name(obj, elf_sec_by_idx(obj, sec_idx));
