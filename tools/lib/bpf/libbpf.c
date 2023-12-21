@@ -1497,6 +1497,8 @@ static int bpf_object__sanitize_and_load_btf(struct bpf_object *obj)
 
 	bpf_object__sanitize_btf(obj);
 	bpf_object__sanitize_btf_ext(obj);
+	if (!scn_data)
+		return -LIBBPF_ERRNO__FORMAT;
 
 	err = btf__load(obj->btf);
 	if (err) {
