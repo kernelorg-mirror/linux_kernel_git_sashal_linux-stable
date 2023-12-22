@@ -359,7 +359,7 @@ nvkm_disp_oneinit(struct nvkm_engine *engine)
 	if (ret)
 		return ret;
 
-	if (disp->func->oneinit) {
+	if (disp->func && disp->func->oneinit) {
 		ret = disp->func->oneinit(disp);
 		if (ret)
 			return ret;
@@ -461,8 +461,10 @@ nvkm_disp_new_(const struct nvkm_disp_func *func, struct nvkm_device *device,
 	spin_lock_init(&disp->client.lock);
 
 	ret = nvkm_engine_ctor(&nvkm_disp, device, type, inst, true, &disp->engine);
-	if (ret)
+	if (ret) {
+		disp->func = NULL;
 		return ret;
+	}
 
 	if (func->super) {
 		disp->super.wq = create_singlethread_workqueue("nvkm-disp");
