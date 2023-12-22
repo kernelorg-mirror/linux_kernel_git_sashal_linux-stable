@@ -14,6 +14,7 @@
 #include <linux/cache.h>
 #include <linux/context_tracking.h>
 #include <linux/irqflags.h>
+#include <linux/rseq.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/personality.h>
