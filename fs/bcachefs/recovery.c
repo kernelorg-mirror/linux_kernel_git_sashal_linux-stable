@@ -1015,7 +1015,9 @@ out:
 		bch2_journal_keys_put_initial(c);
 	kfree(clean);
 
-	if (!ret && test_bit(BCH_FS_NEED_DELETE_DEAD_SNAPSHOTS, &c->flags)) {
+	if (!ret &&
+	    test_bit(BCH_FS_NEED_DELETE_DEAD_SNAPSHOTS, &c->flags) &&
+	    !c->opts.nochanges) {
 		bch2_fs_read_write_early(c);
 		bch2_delete_dead_snapshots_async(c);
 	}

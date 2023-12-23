@@ -395,16 +395,6 @@ static int __bch2_fs_read_write(struct bch_fs *c, bool early)
 	if (test_bit(BCH_FS_RW, &c->flags))
 		return 0;
 
-	if (c->opts.norecovery)
-		return -BCH_ERR_erofs_norecovery;
-
-	/*
-	 * nochanges is used for fsck -n mode - we have to allow going rw
-	 * during recovery for that to work:
-	 */
-	if (c->opts.nochanges && (!early || c->opts.read_only))
-		return -BCH_ERR_erofs_nochanges;
-
 	bch_info(c, "going read-write");
 
 	ret = bch2_sb_members_v2_init(c);
@@ -472,6 +462,12 @@ err:
 
 int bch2_fs_read_write(struct bch_fs *c)
 {
+	if (c->opts.norecovery)
+		return -BCH_ERR_erofs_norecovery;
+
+	if (c->opts.nochanges)
+		return -BCH_ERR_erofs_nochanges;
+
 	return __bch2_fs_read_write(c, false);
 }
 
@@ -992,7 +988,7 @@ int bch2_fs_start(struct bch_fs *c)
 
 	set_bit(BCH_FS_STARTED, &c->flags);
 
-	if (c->opts.read_only || c->opts.nochanges) {
+	if (c->opts.read_only) {
 		bch2_fs_read_only(c);
 	} else {
 		ret = !test_bit(BCH_FS_RW, &c->flags)
@@ -1924,6 +1920,11 @@ struct bch_fs *bch2_fs_open(char * const *devices, unsigned nr_devices,
 			goto err;
 
 		BUG_ON(darray_push(&sbs, sb));
+	}
+
+	if (opts.nochanges && !opts.read_only) {
+		ret = -BCH_ERR_erofs_nochanges;
+		goto err_print;
 	}
 
 	darray_for_each(sbs, sb)
