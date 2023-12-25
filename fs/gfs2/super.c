@@ -770,6 +770,7 @@ static int gfs2_freeze(struct super_block *sb)
 		goto out;
 	}
 
+	atomic_inc(&sb->s_active);
 	for (;;) {
 		error = gfs2_lock_fs_check_clean(sdp, &sdp->sd_freeze_gh);
 		if (!error)
@@ -786,6 +787,7 @@ static int gfs2_freeze(struct super_block *sb)
 	set_bit(SDF_FS_FROZEN, &sdp->sd_flags);
 out:
 	mutex_unlock(&sdp->sd_freeze_mutex);
+	deactivate_super(sb);
 	return error;
 }
 
