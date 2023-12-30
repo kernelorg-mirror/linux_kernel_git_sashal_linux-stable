@@ -261,7 +261,7 @@ static void member_to_text(struct printbuf *out,
 
 	prt_printf(out, "Discard:");
 	prt_tab(out);
-	prt_printf(out, "%llu", BCH_MEMBER_DISCARD(&m));
+	prt_printf(out, "%llu", BCH_MEMBER_DISCARD(&m) ? BCH_MEMBER_DURABILITY(&m) - 1 : 1);
 	prt_newline(out);
 
 	prt_printf(out, "Freespace initialized:");
